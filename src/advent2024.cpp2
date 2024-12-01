@@ -1,0 +1,20 @@
+export module Advent2024;
+
+Advent2024: namespace = {
+    export day : type = {
+        protected m_lines: std::vector<std::string>;
+        protected m_part_two : bool;
+        protected m_verbose : bool;
+        protected m_argint : int;
+        operator= : (out this, lines, part_two, verbose, argint) = {
+            m_lines = lines;
+            m_part_two = part_two;
+            m_verbose = verbose;
+            m_argint = argint;
+        }
+        run : (virtual this) -> int;
+        operator=: (virtual move this) = {}
+    }
+
+    export today_fn : type == (lines: std::vector<std::string>, part_two: bool, verbose: bool, argint: int) -> std::unique_ptr<day>;
+}

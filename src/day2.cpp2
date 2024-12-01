@@ -1,0 +1,99 @@
+export module Day2;
+import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
+
+    //color_s: @enum type = {
+    //    red;
+    //    green;
+    //    blue;
+    //}
+    color_s: type == std::string;
+    dice_s: type == bp::tuple<int, color_s>;
+    turn_s: type == std::vector<dice_s>;
+    line_s: type == bp::tuple<int, std::vector<turn_s>>;
+
+    
+
+
+Day2: namespace = {
+
+    export day : type = {
+        this: Advent2024::day;
+
+        operator= : (out this,  lines, part_two, verbose, argint) = {
+            Advent2024::day = (lines, part_two, verbose, argint);
+        }
+
+        run : (override this) -> int = {
+            
+            color_p := bp::string("red") | bp::string("green") | bp::string("blue");
+            dice_p := bp::int_ >> color_p;
+            turn_p := dice_p % ",";
+            line_p := bp::lit("Game") >> bp::int_ >> bp::lit(":") >> turn_p % ";";
+            total : int = 0;
+
+            for m_lines do (line) {
+                // Each line contains 'Game <number>: <turn>; <turn>; <turn>'
+                // A turn is <dice>, <dice>, <dice>
+                // A dice is <number> <word>
+                parsed_line : line_s = ();
+                if !bp::parse(line, line_p, bp::ws, parsed_line) {
+                    std::cerr << "Parsing failure on *(line)$*!" << std::endl;
+                    exit(1);
+                }
+                game_id: int = 0;
+                turns: std::vector<turn_s> = ();
+                std::tie(game_id, turns) = parsed_line;
+
+                std::cout << "Game (game_id)$ (length (turns.size())$):" << std::endl;
+                possible := true;
+                min_red := 0;
+                min_blue := 0;
+                min_green := 0;
+                for turns do (turn) {
+                    std::cout << "  Turn: (length (turn.size())$)" << std::endl;
+                    red := 0;
+                    green := 0;
+                    blue := 0;
+                    for turn do (dice) {
+                        number: int = 0;
+                        color: std::string = "";
+                        std::tie(number, color) = dice;
+                        std::cout << "    Dice: (number)$ (color)$" << std::endl;
+                        if color == "red" {
+                            red = number;
+                        }
+                        else if color == "green" {
+                            green = number;
+                        }
+                        else if color == "blue" {
+                            blue = number;
+                        }
+                    }
+                    if red > 12 || green > 13 || blue > 14 {
+                        possible = false;
+                    }
+                    if red > min_red {
+                        min_red = red;
+                    }
+                    if green > min_green {
+                        min_green = green;
+                    }
+                    if blue > min_blue {
+                        min_blue = blue;
+                    }
+
+                }
+                if m_part_two {
+                    total += min_red * min_green * min_blue;
+                }
+                else if possible {
+                    total += game_id;
+                }
+            }
+            return total;
+        }
+    }
+}

@@ -1,0 +1,60 @@
+export module Day1;
+import Advent2024;
+
+Day1: namespace = {
+    export day : type = {
+        this: Advent2024::day;
+
+        operator= : (out this,  lines, part_two, verbose, argint) = {
+            Advent2024::day = (lines, part_two, verbose, argint);
+        }
+
+        run : (override this) -> int = {
+            
+            total : int = 0;
+
+            // For part 1, look at each line and find the first and last digit.
+            for m_lines do (line) {
+                firstdigit : std::optional<int> = std::nullopt;
+                lastdigit : std::optional<int> = std::nullopt;
+                if line.size() == 0 {
+                    continue;
+                }
+                offset := 0;
+                for line next offset++ do (ch) {
+                    state := ch;
+                    if m_part_two {
+                        if line.substr(offset, 3) == "one" {
+                            state = '1';
+                        } else if line.substr(offset, 3) == "two" {
+                            state = '2';
+                        } else if line.substr(offset, 5) == "three" {
+                            state = '3';
+                        } else if line.substr(offset, 4) == "four" {
+                            state = '4';
+                        } else if line.substr(offset, 4) == "five" {
+                            state = '5';
+                        } else if line.substr(offset, 3) == "six" {
+                            state = '6';
+                        } else if line.substr(offset, 5) == "seven" {
+                            state = '7';
+                        } else if line.substr(offset, 5) == "eight" {
+                            state = '8';
+                        } else if line.substr(offset, 4) == "nine" {
+                            state = '9';
+                        }
+                    }
+                    if ('0' <= state <= '9') {
+                        if firstdigit == std::nullopt {
+                            firstdigit = state - '0';
+                        }
+                        lastdigit = state - '0';
+                    }
+                }
+                assert(firstdigit != std::nullopt, "Found a line with no digits!: *(line)$*");
+                total += (firstdigit as int) * 10 + (lastdigit as int);
+            }
+            return total;
+        }
+    }
+}

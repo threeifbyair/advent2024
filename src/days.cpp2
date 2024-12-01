@@ -1,0 +1,72 @@
+export module Days;
+import Advent2024;
+import Day1;
+import Day2;
+import Day3;
+import Day4;
+import Day5;
+import Day6;
+import Day7;
+import Day8;
+import Day9;
+import Day10;
+import Day11;
+import Day12;
+import Day13;
+import Day14;
+import Day15;
+import Day16;
+import Day17;
+import Day18;
+import Day19;
+import Day20;
+import Day21;
+import Day22;
+import Day23;
+import Day24;
+import Day25;
+
+Days: namespace = {
+    bad_day: type = {
+        this: Advent2024::day;
+        operator= : (out this, lines, part_two, verbose, argint) = {
+            Advent2024::day = (lines, part_two, verbose, argint);
+        }
+        run : (override this) -> int = {
+            std::cout << "So you've had a bad day...";
+            return -1;
+        }
+    }
+
+    export make_day : (day: int, lines: std::vector<std::string>, part_two: bool, verbose: bool, argint: int) -> std::unique_ptr<Advent2024::day> = {
+        return inspect day -> std::unique_ptr<Advent2024::day> {
+            is 1 = unique.new<Day1::day>(lines, part_two, verbose, argint);
+            is 2 = unique.new<Day2::day>(lines, part_two, verbose, argint);
+            is 3 = unique.new<Day3::day>(lines, part_two, verbose, argint);
+            is 4 = unique.new<Day4::day>(lines, part_two, verbose, argint);
+            is 5 = unique.new<Day5::day>(lines, part_two, verbose, argint);
+            is 6 = unique.new<Day6::day>(lines, part_two, verbose, argint);
+            is 7 = unique.new<Day7::day>(lines, part_two, verbose, argint);
+            is 8 = unique.new<Day8::day>(lines, part_two, verbose, argint);
+            is 9 = unique.new<Day9::day>(lines, part_two, verbose, argint);
+            is 10 = unique.new<Day10::day>(lines, part_two, verbose, argint);
+            is 11 = unique.new<Day11::day>(lines, part_two, verbose, argint);
+            is 12 = unique.new<Day12::day>(lines, part_two, verbose, argint);
+            is 13 = unique.new<Day13::day>(lines, part_two, verbose, argint);
+            is 14 = unique.new<Day14::day>(lines, part_two, verbose, argint);
+            is 15 = unique.new<Day15::day>(lines, part_two, verbose, argint);
+            is 16 = unique.new<Day16::day>(lines, part_two, verbose, argint);
+            is 17 = unique.new<Day17::day>(lines, part_two, verbose, argint);
+            is 18 = unique.new<Day18::day>(lines, part_two, verbose, argint);
+            is 19 = unique.new<Day19::day>(lines, part_two, verbose, argint);
+            is 20 = unique.new<Day20::day>(lines, part_two, verbose, argint);
+            is 21 = unique.new<Day21::day>(lines, part_two, verbose, argint);
+            is 22 = unique.new<Day22::day>(lines, part_two, verbose, argint);
+            is 23 = unique.new<Day23::day>(lines, part_two, verbose, argint);
+            is 24 = unique.new<Day24::day>(lines, part_two, verbose, argint);
+            is 25 = unique.new<Day25::day>(lines, part_two, verbose, argint);
+
+            is _ = unique.new<bad_day>(lines, part_two, verbose, argint);
+        };
+    }
+}

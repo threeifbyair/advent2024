@@ -1,0 +1,17 @@
+export module Day25;
+import Advent2024;
+
+Day25: namespace = {
+    export day : type = {
+        this: Advent2024::day;
+
+        operator= : (out this,  lines, part_two, verbose, argint) = {
+            Advent2024::day = (lines, part_two, verbose, argint);
+        }
+
+        run : (override this) -> int = {
+            std::cout << "Not implemented yet!";
+            return -42;
+        }
+    }
+}

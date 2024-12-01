@@ -1,0 +1,70 @@
+import Days;
+import program_options;
+
+po : namespace == boost::program_options;
+
+read_file: (inout infd : std::istream) -> std::vector<std::string> = {
+   lines := std::vector<std::string>();
+   line : std::string = "";
+   std::getline(infd, line);
+   while infd as bool 
+   next std::getline(infd, line)  
+   {
+      lines.push_back(line);
+   }
+   return lines;
+}
+
+main : (args) -> int = {
+   desc : po::options_description = "Allowed options";
+   infile: std::string = "";
+   verbose : bool = false;
+   part_two : bool = false;
+   day : int = 0;
+   argint : int = 0;
+
+   desc.add_options()
+       ("help,h", "produce help message")
+       ("input,i", po::value<std::string>(infile&)*.default_value("-"), "Input file")
+       ("part-two,p", po::bool_switch(part_two&), "Perform part two of the challemge")
+       ("verbose,v", po::bool_switch(verbose&), "Print verbose output")
+       ("day,d", po::value<int>(day&), "Which day to run")
+       ("argint,a", po::value<int>(argint&), "An extra argument")
+   ;
+
+   vm := po::variables_map();
+   po::store(po::parse_command_line(args.argc, args.argv, desc), vm);
+   po::notify(vm);    
+
+   if (vm.count("help")) {
+      std::cerr << desc << "\n";
+      return 1;
+   }
+
+   //if (day == 0 || day > Days.max_day) {
+   //   std::cerr << "Invalid day (day)$!" << std::endl;
+   //   return 1;
+   //}
+
+   infd := std::ifstream(infile);
+   lines : std::vector<std::string>;
+   if (!infd.is_open()) {
+      if (infile == "-") {
+         lines = read_file(std::cin);
+      }
+      else {
+         lines = ();
+         std::cerr << "Cannot open file (infile)%!" << std::endl;
+         return 1;
+      }
+   }
+   else {
+      lines = read_file(infd);
+   }
+   _ = infd;
+
+   runnable := Days::make_day(day, lines, part_two, verbose, argint);
+   std::cout << "(runnable*.run())$" << std::endl;
+   return 0;
+}
+
