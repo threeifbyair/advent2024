@@ -4,19 +4,6 @@ import parser;
 
 bp: namespace == boost::parser;
 
-    //color_s: @enum type = {
-    //    red;
-    //    green;
-    //    blue;
-    //}
-    color_s: type == std::string;
-    dice_s: type == bp::tuple<int, color_s>;
-    turn_s: type == std::vector<dice_s>;
-    line_s: type == bp::tuple<int, std::vector<turn_s>>;
-
-    
-
-
 Day2: namespace = {
 
     export day : type = {
@@ -26,71 +13,73 @@ Day2: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        unsafe_offset : (this, levels: std::vector<int>) -> std::optional<int> = {
+            if levels[1] == levels[0] {
+                if m_verbose {
+                    std::cout << "Initial values (levels[0])$ and (levels[1])$ are equal, not safe" << std::endl;
+                }
+                return 0;    
+            }
+            else {
+                mindiff := -3;
+                maxdiff := -1;
+                if levels[1] > levels[0] {
+                    mindiff = 1;
+                    maxdiff = 3;
+                }
+                liter := levels.begin();
+                lastlevel := levels[0];
+                liter++;
+                offset := 1;
+                while liter != levels.end()
+                next offset++
+                {
+                    diff := liter* - lastlevel;
+                    if mindiff <= diff <= maxdiff {
+                        lastlevel = liter*;
+                        liter++;
+                    }
+                    else {
+                        if m_verbose {
+                            std::cout << "Neighboring values (lastlevel)$ and (liter*)$ not within diff range (mindiff)$ -> (maxdiff)$, not safe" << std::endl;
+                        }
+                        return offset;
+                    }
+                }
+                return std::nullopt;
+            }
+        }
+
         run : (override this) -> int = {
             
-            color_p := bp::string("red") | bp::string("green") | bp::string("blue");
-            dice_p := bp::int_ >> color_p;
-            turn_p := dice_p % ",";
-            line_p := bp::lit("Game") >> bp::int_ >> bp::lit(":") >> turn_p % ";";
             total : int = 0;
 
             for m_lines do (line) {
                 // Each line contains 'Game <number>: <turn>; <turn>; <turn>'
                 // A turn is <dice>, <dice>, <dice>
                 // A dice is <number> <word>
-                parsed_line : line_s = ();
-                if !bp::parse(line, line_p, bp::ws, parsed_line) {
+                levels : std::vector<int> = ();
+                if !bp::parse(line, bp::int_*, bp::ws, levels) {
                     std::cerr << "Parsing failure on *(line)$*!" << std::endl;
                     exit(1);
                 }
-                game_id: int = 0;
-                turns: std::vector<turn_s> = ();
-                std::tie(game_id, turns) = parsed_line;
-
-                std::cout << "Game (game_id)$ (length (turns.size())$):" << std::endl;
-                possible := true;
-                min_red := 0;
-                min_blue := 0;
-                min_green := 0;
-                for turns do (turn) {
-                    std::cout << "  Turn: (length (turn.size())$)" << std::endl;
-                    red := 0;
-                    green := 0;
-                    blue := 0;
-                    for turn do (dice) {
-                        number: int = 0;
-                        color: std::string = "";
-                        std::tie(number, color) = dice;
-                        std::cout << "    Dice: (number)$ (color)$" << std::endl;
-                        if color == "red" {
-                            red = number;
-                        }
-                        else if color == "green" {
-                            green = number;
-                        }
-                        else if color == "blue" {
-                            blue = number;
-                        }
+                safe := true;
+                if levels.size() < (2 as size_t) {
+                    if m_verbose {
+                        std::cout << "Too small at (levels.size())$, not safe" << std::endl;
                     }
-                    if red > 12 || green > 13 || blue > 14 {
-                        possible = false;
-                    }
-                    if red > min_red {
-                        min_red = red;
-                    }
-                    if green > min_green {
-                        min_green = green;
-                    }
-                    if blue > min_blue {
-                        min_blue = blue;
-                    }
-
+                    safe = false;
                 }
-                if m_part_two {
-                    total += min_red * min_green * min_blue;
+                else {
+                    if unsafe_offset(levels) != std::nullopt {
+                        safe = false;
+                    }
                 }
-                else if possible {
-                    total += game_id;
+                if safe {
+                    if m_verbose {
+                        std::cout << "safe" << std::endl;
+                    }
+                    total++;
                 }
             }
             return total;
