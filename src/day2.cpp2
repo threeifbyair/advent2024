@@ -4,6 +4,20 @@ import parser;
 
 bp: namespace == boost::parser;
 
+cpp2: namespace = {
+    to_string : (vec : std::vector<int>) -> std::string = {
+        retval : std::string = "[";
+        for vec do (val) {
+            retval += "(val)$, ";
+        }
+        if retval.ssize() > 2 {
+            _ = retval.erase(retval.ssize() - 2, 2);
+        }
+        retval += "]";
+        return retval;
+    }
+}
+
 Day2: namespace = {
 
     export day : type = {
@@ -64,15 +78,42 @@ Day2: namespace = {
                     exit(1);
                 }
                 safe := true;
-                if levels.size() < (2 as size_t) {
+                if m_verbose {
+                    std::cout << "Processing vector (levels)$... ";
+                }
+                if levels.ssize() < 2 {
                     if m_verbose {
                         std::cout << "Too small at (levels.size())$, not safe" << std::endl;
                     }
                     safe = false;
                 }
                 else {
-                    if unsafe_offset(levels) != std::nullopt {
-                        safe = false;
+                    offset := unsafe_offset(levels);
+                    if offset != std::nullopt {
+                        if m_part_two {
+                            // Remove 0, 1, offset-1 and offset and see if it helps. (Why 0 and 1? Because they set the monotonicity.)
+                            to_remove : std::set<int> = (0, 1, offset as int);
+                            if offset > 0 {
+                                _ = to_remove.insert(offset as int - 1);
+                            }
+                            safe = false;
+                            for to_remove do (remove) {
+                                tryvec := levels;
+                                _ = tryvec.erase(tryvec.begin() + remove);
+                                if m_verbose {
+                                    std::cout << "Reprocessing vector (tryvec)$... ";
+                                }
+                                if unsafe_offset(tryvec) == std::nullopt {
+                                    // We got one!
+                                    safe = true;
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            safe = false;
+                        }
                     }
                 }
                 if safe {

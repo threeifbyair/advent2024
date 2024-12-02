@@ -45,8 +45,19 @@ function(add_cpp2_file target cpp2_file is_module)
     else()
         target_sources(${target} PRIVATE ${output_file})
     endif()
-
 endfunction()
+
+# Specify the build types
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
+
+# Set the default build type if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build (Debug or Release)" FORCE)
+endif()
+
+# Set compiler flags for different build types
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 #cmake_policy(SET CMP0167 NEW)
 set(Boost_DIR /home/abell/.local/lib/cmake/Boost-1.83.0)
