@@ -1,5 +1,8 @@
 export module Day3;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day3: namespace = {
     export day : type = {
@@ -10,8 +13,39 @@ Day3: namespace = {
         }
 
         run : (override this) -> int = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            
+            total : int = 0;
+            left : std::vector<int> = ();
+            right : std::vector<int> = ();
+            roccur : std::unordered_map<int, int> = ();
+            line_p :=  bp::lit("mul(") >> bp::int_ >> bp::lit(",") >> bp::int_ >> bp::lit(")");
+            enabled := true;
+
+            for m_lines do (line) {
+                for 0..<line.size() do (offset) {
+                    if line[offset] == 'm' {
+                        // See if we can find a mul here
+                        parsed_line : std::pair<int, int> = ();
+                        liter := line.begin();
+                        liter += offset;
+                        if bp::prefix_parse(liter, line.end(), line_p, parsed_line) {
+                            if enabled || !m_part_two {
+                                total += parsed_line.first * parsed_line.second;
+                            }
+                        }
+                        _ = liter;
+                    }
+                    else if line[offset] == 'd' {
+                        if line.substr(offset).starts_with("do()") {
+                            enabled = true;
+                        }
+                        else if line.substr(offset).starts_with("don't()") {
+                            enabled = false;
+                        }
+                    }
+                }
+            }
+            return total;
         }
     }
 }

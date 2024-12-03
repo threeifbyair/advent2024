@@ -3,6 +3,7 @@ module;
 export module parser;
 namespace boost::parser {
     export using boost::parser::parse;
+    export using boost::parser::prefix_parse;
     export using boost::parser::int_;
     export using boost::parser::char_;
     export using boost::parser::ws;
