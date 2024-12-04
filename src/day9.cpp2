@@ -9,7 +9,7 @@ Day9: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
-        run : (override this) -> int = {
+        run : (override inout this) -> int = {
             std::cout << "Not implemented yet!";
             return -42;
         }

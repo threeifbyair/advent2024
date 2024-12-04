@@ -64,7 +64,7 @@ Day2: namespace = {
             }
         }
 
-        run : (override this) -> int = {
+        run : (override inout this) -> int = {
             
             total : int = 0;
 

@@ -9,9 +9,55 @@ Day4: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
-        run : (override this) -> int = {
-            std::cout << "Not implemented yet!";
-            return -42;
+        find_xmas: (this, x:int, y:int, dx:int, dy:int) -> int = {
+            if m_lines[y][x] == 'X' && m_lines[y+dy][x+dx] == 'M' && m_lines[y+2*dy][x+2*dx] == 'A' && m_lines[y+3*dy][x+3*dx] == 'S' {
+                return 1;
+            }
+            return 0;
+        }
+
+        find_mas: (this, x:int, y:int, dx:int, dy:int) -> int = {
+            if m_lines[y][x] == 'A' && m_lines[y+dy][x+dx] == 'M' && m_lines[y-dy][x-dx] == 'S' {
+                if m_lines[y-dy][x+dx] == 'M' && m_lines[y+dy][x-dx] == 'S' {
+                    return 1;
+                }
+                if m_lines[y+dy][x-dx] == 'M' && m_lines[y-dy][x+dx] == 'S' {
+                    return 1;
+                }
+            }
+            return 0;
+        }
+
+        run : (override inout this) -> int = {
+            total: int = 0;
+
+            // First put a boundary around the map to make sure we don't overstep. 
+            for 0..<m_lines.size() do (y) {
+                m_lines[y] = "." + m_lines[y] + ".";
+            }
+            linelen := m_lines[0].size();
+            boundary := std::string(linelen, '.');
+            _ = m_lines.insert(m_lines.begin(), boundary);
+            _ = m_lines.insert(m_lines.end(), boundary);
+
+            for 0..<m_lines.size() do (y) {
+                for 0..<m_lines[y].size() do (x) {
+                    if m_part_two {
+                        if m_lines[y][x] == 'A' {
+                            total += find_mas(x, y, -1, -1) + find_mas(x, y, -1, 1) + find_mas(x, y, 1, -1) + find_mas(x, y, 1, 1);
+                        }
+                    }
+                    else {
+                        if m_lines[y][x] == 'X' {
+                            total += find_xmas(x, y, -1, -1) + find_xmas(x, y, -1, 0) + find_xmas(x, y, -1, 1) + find_xmas(x, y, 0, -1) + find_xmas(x, y, 0, 1) + find_xmas(x, y, 1, -1) + find_xmas(x, y, 1, 0) + find_xmas(x, y, 1, 1);
+                        }
+                    }
+                }
+            }
+            if m_part_two {
+                return total / 2; // we'll find everything twice
+            }
+            return total;
         }
     }
 }
