@@ -1,5 +1,23 @@
 export module Advent2024;
 
+cpp2: namespace = {
+    export to_string : <T: type> (vec : std::vector<T>) -> std::string = {
+        outstr : std::string = "[";
+        first := true;
+        for vec do (val) {
+            if first {
+                first = false;
+            }
+            else {
+                outstr += ", ";
+            }
+            outstr += cpp2::to_string(val) ;
+        }
+        outstr += "]";
+        return outstr;
+    }
+}
+
 Advent2024: namespace = {
     export day : type = {
         protected m_lines: std::vector<std::string>;

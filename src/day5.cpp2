@@ -1,5 +1,8 @@
 export module Day5;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day5: namespace = {
     export day : type = {
@@ -10,8 +13,57 @@ Day5: namespace = {
         }
 
         run : (override inout this) -> int = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            
+            total : int = 0;
+            rules : std::unordered_map<int, std::unordered_map<int, bool>> = ();
+            rules_p :=  bp::int_ % "|";
+            updates_p :=  bp::int_ % ",";
+            in_updates := false;
+
+            for m_lines do (line) {
+                if in_updates {
+                    update : std::vector<int> = ();
+                    ok := bp::parse(line, updates_p, update);
+                    assert(ok);
+                    assert (update.size() % 2 == 1); // there must be an odd number!
+                    possible := true;
+                    if m_verbose {
+                        std::cout << "Checking update (update)$..." << std::endl;
+                    }
+                    outer: for 0..<update.size() do (first) {
+                        for (first+1)..<update.size() do (second) {
+                            if m_verbose {
+                                std::cout << "(update[first])$ -> (update[second])$... ";
+                            }
+                            if rules[update[first]][update[second]] {
+                                if m_verbose {
+                                    std::cout << "VIOLATION" << std::endl;
+                                }
+                                possible = false;
+                                break outer;
+                            }
+                        }
+                    }
+                    if (possible) {
+                        total += update[(update.size() - 1) / 2];
+                        if m_verbose {
+                            std::cout << "ok, middle number is (update[(update.size() - 1) / 2])$" << std::endl;
+                        }
+                    }
+                }
+                else {
+                    if line.size() == 0 {
+                        in_updates = true;
+                        continue;
+                    }
+                    rule : std::vector<int> = ();
+                    ok := bp::parse(line, rules_p, rule);
+                    assert(ok);
+                    assert(rule.size() == 2);
+                    rules[rule[1]][rule[0]] = true; // meaning '1->0 is a violation'
+                }
+            }
+            return total;
         }
     }
 }
