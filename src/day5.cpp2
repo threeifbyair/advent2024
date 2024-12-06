@@ -30,21 +30,32 @@ Day5: namespace = {
                     if m_verbose {
                         std::cout << "Checking update (update)$..." << std::endl;
                     }
-                    outer: for 0..<update.size() do (first) {
-                        for (first+1)..<update.size() do (second) {
-                            if m_verbose {
-                                std::cout << "(update[first])$ -> (update[second])$... ";
-                            }
-                            if rules[update[first]][update[second]] {
+                    retry := true;
+                    while retry {
+                        retry = false;
+                        outer: for 0..<update.size() do (first) {
+                            for (first+1)..<update.size() do (second) {
                                 if m_verbose {
-                                    std::cout << "VIOLATION" << std::endl;
+                                    std::cout << "(update[first])$ -> (update[second])$... ";
                                 }
-                                possible = false;
-                                break outer;
+                                if rules[update[first]][update[second]] {
+                                    if m_verbose {
+                                        std::cout << "VIOLATION" << std::endl;
+                                    }
+                                    possible = false;
+                                    if m_part_two {
+                                        // Switch the order and start again.
+                                        swap := update[second];
+                                        update[second] = update[first];
+                                        update[first] = swap;
+                                        retry = true;
+                                    }
+                                    break outer;
+                                }
                             }
                         }
                     }
-                    if (possible) {
+                    if (possible ^ m_part_two) {
                         total += update[(update.size() - 1) / 2];
                         if m_verbose {
                             std::cout << "ok, middle number is (update[(update.size() - 1) / 2])$" << std::endl;
