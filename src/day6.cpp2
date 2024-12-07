@@ -9,9 +9,106 @@ Day6: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        action: @struct type = {
+            replace: bool;
+            dx_once: int;
+            dy_once: int;
+            dx: int;
+            dy: int;
+            increment: bool;
+            finished: bool;
+        }
+
+        hit_wall: (dx : int, dy: int) -> action = {
+            // Oops, we hit a wall! Adjust ourselves to where we were, turn right, and back up one so we get back to where we were.
+            if dx == -1 && dy == 0 {
+                // If we were going west, jump southeast and point north.
+                return action(false, 1, 1, 0, -1, false, false);
+            }
+            if dx == 0 && dy == -1 {
+                // If we were going north, jump southwest and point east.
+                return action(false, -1, 1, 1, 0, false, false);
+            }
+            if dx == 1 && dy == 0 {
+                // If we were going east, jump northwest and point south.
+                return action(false, -1, -1, 0, 1, false, false);
+            }
+            if dx == 0 && dy == 1 {
+                // If we were going south, jump northeast and point west.
+                return action(false, 1, -1, -1, 0, false, false);
+            }
+            assert(false);
+            return action(false, 0, 0, 0, 0, false, false);
+        }
+
+        find_move: (loc: i8, dx: int, dy: int) -> action = {
+            if loc == '^' {
+                return action(true, 0, 0, dx, dy, true, false);
+            }
+            if loc == '.' {
+                return action(true, 0, 0, dx, dy, true, false);
+            }
+            if loc == 'X' {
+                return action(false, 0, 0, dx, dy, false, false);
+            }
+            if loc == '#' {
+                return hit_wall(dx, dy);
+            }
+            if loc == '*' {
+                return action(false, 0, 0, 0, 0, false, true);
+            }
+            assert(false);
+            return action(false, 0, 0, 0, 0, false, false);
+        }
+
+
         run : (override inout this) -> int = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total: int = 0;
+
+            // First put a boundary around the map to make sure we don't overstep. 
+            for 0..<m_lines.size() do (y) {
+                m_lines[y] = "*" + m_lines[y] + "*";
+            }
+            linelen := m_lines[0].size();
+            boundary := std::string(linelen, '*');
+            _ = m_lines.insert(m_lines.begin(), boundary);
+            _ = m_lines.insert(m_lines.end(), boundary);
+
+            x: size_t = 0;
+            y: size_t = 0;
+            dx: int = 0;
+            dy: int = -1; // start going north
+
+            // Where is the guard starting?
+            for 0..<m_lines.size() do (starty) {
+                startx := m_lines[starty].find('^');
+                if startx != m_lines[starty].npos {
+                    y = starty;
+                    x = startx;
+                    break;
+                }
+            }
+            while true {
+                next := find_move(m_lines[y][x], dx, dy);
+
+                // Now move.
+                if next.replace {
+                    m_lines[y][x] = 'X';
+                }
+                if next.increment {
+                    total++;
+                }
+                if next.finished {
+                    break;
+                }
+                x += next.dx_once;
+                y += next.dy_once;
+                dx = next.dx;
+                dy = next.dy;
+                x += dx;
+                y += dy;
+            }
+            return total;
         }
     }
 }
