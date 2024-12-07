@@ -61,6 +61,98 @@ Day6: namespace = {
             return action(false, 0, 0, 0, 0, false, false);
         }
 
+        state: @struct type = 
+        {
+            x: int;
+            y: int;
+            dx: int;
+            dy: int;
+        }
+
+        print_maze: (maze: std::vector<std::string>) = {
+            for maze do (line) {
+                std::cout << line << std::endl;
+            }
+        }
+
+        run_maze: (this, maze: std::vector<std::string>, copy x: int, copy y: int, copy dx: int, copy dy: int, nest: bool) -> (total:int, exited:bool, out_maze:std::vector<std::string>) = {
+            total = 0;
+            exited = false;
+            startx := x;
+            starty := y;
+            seen: std::unordered_set<int> = ();
+            blocked: std::unordered_set<int> = ();
+            working_maze : std::vector<std::string> = (maze.size(), "");
+            for 0..<maze.size() do (i) {
+                line_copy : std::string = maze[i];
+                working_maze[i] = line_copy;
+            }
+
+            while true {
+                hash := ((dx + 2) << 28) | ((dy + 2) << 26) |  (x << 12) | y;
+                if seen.count(hash) {
+                    exited = false;
+                    break;
+                }
+                _ = seen.insert(hash);
+
+                next := find_move(working_maze[y][x], dx, dy);
+
+                // Now move.
+                if next.replace {
+                    working_maze[y][x] = 'X';
+                }
+                if next.increment && !nest {
+                    total++;
+                }
+                if next.finished {
+                    exited = true;
+                    if m_verbose {
+                        std::cout << "Exited at ((x)$, (y)$)" << std::endl;
+                    }
+                    break;
+                }
+                x += next.dx_once;
+                y += next.dy_once;
+                dx = next.dx;
+                dy = next.dy;
+                x += dx;
+                y += dy;
+                if nest {
+                    // We need to see if putting a barrier here would cause a loop.
+                    block_hash := (x << 12) | y;
+                    if working_maze[y][x] != '*' && !blocked.count(block_hash) {
+                        // Don't do this if we escaped or came here before!
+                        new_maze : std::vector<std::string> = (maze.size(), "");
+                        for 0..<maze.size() do (i) {
+                            line_copy : std::string = maze[i];
+                            new_maze[i] = line_copy;
+                        }
+                        new_maze[y][x] = '#';
+                        if m_verbose {
+                            std::cout << "Blocking ((x)$, (y)$) containing (maze[y][x])$..." << std::endl;
+                            print_maze(new_maze);
+                        }
+                        inner := run_maze(new_maze, startx, starty, 0, -1, false);
+                        if m_verbose {
+                            if inner.exited {
+                                std::cout << "Exited" << std::endl;
+                            }
+                            else {
+                                std::cout << "Looped" << std::endl;
+                            }
+                            print_maze(inner.out_maze);
+                        }
+                        if !inner.exited {
+                            total++;
+                        }
+                        _ = blocked.insert(block_hash);
+                    }
+                }
+            }
+            out_maze = working_maze;
+        }
+
 
         run : (override inout this) -> int = {
             total: int = 0;
@@ -88,26 +180,11 @@ Day6: namespace = {
                     break;
                 }
             }
-            while true {
-                next := find_move(m_lines[y][x], dx, dy);
-
-                // Now move.
-                if next.replace {
-                    m_lines[y][x] = 'X';
-                }
-                if next.increment {
-                    total++;
-                }
-                if next.finished {
-                    break;
-                }
-                x += next.dx_once;
-                y += next.dy_once;
-                dx = next.dx;
-                dy = next.dy;
-                x += dx;
-                y += dy;
+            if m_verbose {
+                print_maze(m_lines);
             }
+            result := run_maze(m_lines, x, y, dx, dy, m_part_two);
+            total = result.total;
             return total;
         }
     }
