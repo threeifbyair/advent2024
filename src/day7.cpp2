@@ -1,5 +1,8 @@
 export module Day7;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day7: namespace = {
     export day : type = {
@@ -9,9 +12,46 @@ Day7: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        totalize : (data : std::vector<ulong>, running_total: ulong, offset: size_t, so_far: std::string) -> bool = {
+            target := data[0];
+            if running_total == target && offset == data.size() {
+                std::cout << so_far << std::endl;
+                return true;
+            }
+            if running_total > target {
+                return false;
+            }
+            if offset >= data.size() {
+                return false;
+            }
+            addend := running_total + data[offset];
+            if totalize(data, addend, offset + 1, so_far + " + (data[offset])$") {
+                return true;
+            }
+            multiplicand := running_total * data[offset];
+            return totalize(data, multiplicand, offset + 1, so_far + " * (data[offset])$");
+        }
+
         run : (override inout this) -> int = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total : ulong = 0;
+            rule :=  bp::ulong_ >> bp::lit(":") >> +bp::ulong_;
+
+            for m_lines do (line) {
+                equation : std::optional<std::vector<ulong>> = bp::parse(line, rule, bp::ws);
+                if !equation {
+                    std::cout << "Parse failure for (line)$" << std::endl;
+                    assert(false);
+                }
+                assert(equation);
+                if totalize(equation*, equation*[1], 2, "(equation*[0])$ = (equation*[1])$") {
+                    total += equation*[0];
+                }
+                else {
+                    std::cout << "(equation*[0])$ has no solutions" << std::endl;
+                }
+            }
+            std::cout << "Real total is (total)$" << std::endl;
+            return 0;
         }
     }
 }

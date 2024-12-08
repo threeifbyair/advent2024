@@ -6,6 +6,9 @@ namespace boost::parser {
     export using boost::parser::prefix_parse;
     export using boost::parser::int_;
     export using boost::parser::char_;
+    export using boost::parser::double_;
+    export using boost::parser::float_;
+    export using boost::parser::ulong_;
     export using boost::parser::ws;
     export using boost::parser::lit;
     export using boost::parser::string;
