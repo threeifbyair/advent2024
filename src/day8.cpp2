@@ -9,9 +9,72 @@ Day8: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        coords: type == std::pair<int,int>;
+
         run : (override inout this) -> int = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total: int = 0;
+            antennae : std::unordered_map<i8,std::vector<coords>> = ();
+            antinodes : std::unordered_set<int> = ();
+
+            max_x := m_lines.ssize();
+            max_y := m_lines[0].ssize();
+
+            // Map out the antennae.
+            for 0..<m_lines.size() do (y) {
+                for 0..<m_lines[y].size() do (x) {
+                    if m_lines[y][x] != '.' {
+                        _ = antennae[m_lines[y][x]].push_back(coords(x,y));
+                    }
+                }
+            }
+            if m_verbose {
+                std::cout << "Antennae: (antennae)$" << std::endl;
+            }
+
+            // Calculate antinodes.
+            for antennae do (freq) {
+                ants := freq.second;
+                for 0..<ants.size() do (i) {
+                    for (i+1)..<ants.size() do (j) {
+                        diffx := ants[i].first - ants[j].first;
+                        diffy := ants[i].second - ants[j].second;
+                        if m_part_two {
+                            gcd := std::gcd(std::abs(diffx), std::abs(diffy));
+                            diffx /= gcd;
+                            diffy /= gcd;
+                            antx := ants[i].first;
+                            anty := ants[i].second;
+                            while antx >= 0 && antx < max_x && anty >= 0 && anty < max_y {
+                                _ = antinodes.insert ((antx << 16) | anty);
+                                antx += diffx;
+                                anty += diffy;
+                            }
+                            antx = ants[i].first - diffx;
+                            anty = ants[i].second - diffy;
+                            while antx >= 0 && antx < max_x && anty >= 0 && anty < max_y {
+                                _ = antinodes.insert ((antx << 16) | anty);
+                                antx -= diffx;
+                                anty -= diffy;
+                            }
+                        }
+                        else {
+                            antinode1 := coords(ants[i].first - 2*diffx, ants[i].second - 2*diffy);
+                            antinode2 := coords(ants[j].first + 2*diffx, ants[j].second + 2*diffy);
+                            if antinode1.first >= 0 && antinode1.first < max_x && antinode1.second >= 0 && antinode1.second < max_y {
+                                _ = antinodes.insert((antinode1.first << 16) | antinode1.second);
+                            }
+                            if antinode2.first >= 0 && antinode2.first < max_x && antinode2.second >= 0 && antinode2.second < max_y {
+                                _ = antinodes.insert((antinode2.first << 16) | antinode2.second);
+                            }
+                            if m_verbose {
+                                std::cout << "Nodes (ants[i])$ and (ants[j])$ generate antinodes (antinode1)$ and (antinode2)$" << std::endl;
+                            }
+                        }
+                    }
+                }
+            }
+            total = antinodes.size();
+            return total;
         }
     }
 }

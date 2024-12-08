@@ -16,6 +16,23 @@ cpp2: namespace = {
         outstr += "]";
         return outstr;
     }
+
+    export to_string : <T: type, U: type> (vec : std::unordered_map<T,U>) -> std::string = {
+        outstr : std::string = "{";
+        first := true;
+        for vec do (val) {
+            if first {
+                first = false;
+            }
+            else {
+                outstr += ", ";
+            }
+            outstr += cpp2::to_string(val.first) + ": " + cpp2::to_string(val.second) ;
+        }
+        outstr += "}";
+        return outstr;
+    }
+
 }
 
 Advent2024: namespace = {
