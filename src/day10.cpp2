@@ -9,30 +9,38 @@ Day10: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
-        find_trail : (this, x: int, y: int, height: i8) -> std::unordered_set<int> = {
-            result : std::unordered_set<int> = ();
+        find_trail : (this, x: int, y: int, height: i8) -> std::vector<int> = {
+            result : std::vector<int> = ();
             if m_lines[y][x] == '9' {
                 if m_verbose {
                     std::cout << "Found summit at ((x)$,(y)$)" << std::endl;
                 }
-                _ = result.insert((x<<16)|y);
+                result.push_back((x<<16)|y);
                 return result;
             }
             if m_lines[y][x-1] == height + 1 {
                 subresult := find_trail(x-1, y, height + 1);
-                result.insert(subresult.begin(), subresult.end());
+                for subresult do (spot) {
+                    result.push_back(spot);
+                }
             }
             if m_lines[y][x+1] == height + 1 {
                 subresult := find_trail(x+1, y, height + 1);
-                result.insert(subresult.begin(), subresult.end());
+                for subresult do (spot) {
+                    result.push_back(spot);
+                }
             }
             if m_lines[y-1][x] == height + 1 {
                 subresult := find_trail(x, y-1, height + 1);
-                result.insert(subresult.begin(), subresult.end());
+                for subresult do (spot) {
+                    result.push_back(spot);
+                }
             }
             if m_lines[y+1][x] == height + 1 {
                 subresult := find_trail(x, y+1, height + 1);
-                result.insert(subresult.begin(), subresult.end());
+                for subresult do (spot) {
+                    result.push_back(spot);
+                }
             }
             return result;
         }
@@ -61,7 +69,16 @@ Day10: namespace = {
                         if m_verbose {
                             std::cout << "Found (summits.size())$ summits" << std::endl;
                         }
-                        total += summits.size();
+                        if m_part_two {
+                            total += summits.size();
+                        } 
+                        else {
+                            set : std::unordered_set<int> = ();
+                            for summits do (spot) {
+                                _ = set.insert(spot);
+                            }
+                            total += set.size();
+                        }
                     }
                 }
             }
