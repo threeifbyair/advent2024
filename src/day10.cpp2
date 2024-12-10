@@ -9,9 +9,63 @@ Day10: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        find_trail : (this, x: int, y: int, height: i8) -> std::unordered_set<int> = {
+            result : std::unordered_set<int> = ();
+            if m_lines[y][x] == '9' {
+                if m_verbose {
+                    std::cout << "Found summit at ((x)$,(y)$)" << std::endl;
+                }
+                _ = result.insert((x<<16)|y);
+                return result;
+            }
+            if m_lines[y][x-1] == height + 1 {
+                subresult := find_trail(x-1, y, height + 1);
+                result.insert(subresult.begin(), subresult.end());
+            }
+            if m_lines[y][x+1] == height + 1 {
+                subresult := find_trail(x+1, y, height + 1);
+                result.insert(subresult.begin(), subresult.end());
+            }
+            if m_lines[y-1][x] == height + 1 {
+                subresult := find_trail(x, y-1, height + 1);
+                result.insert(subresult.begin(), subresult.end());
+            }
+            if m_lines[y+1][x] == height + 1 {
+                subresult := find_trail(x, y+1, height + 1);
+                result.insert(subresult.begin(), subresult.end());
+            }
+            return result;
+        }
+
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total: i64 = 0;
+
+            // First put a boundary around the map to make sure we don't overstep. 
+            for 0..<m_lines.size() do (y) {
+                m_lines[y] = "*" + m_lines[y] + "*";
+            }
+            linelen := m_lines[0].size();
+            boundary := std::string(linelen, '*');
+            _ = m_lines.insert(m_lines.begin(), boundary);
+            _ = m_lines.insert(m_lines.end(), boundary);
+
+            // Let's find a trailhead.
+            for 0..<m_lines.size() do (starty) {
+                for 0..<m_lines[starty].size() do (startx) {
+                    if m_lines[starty][startx] == '0' {
+                        if m_verbose {
+                            std::cout << "Found trailhead at ((startx)$, (starty)$)" << std::endl;
+                        }
+                        summits := find_trail(startx, starty, '0');
+                        if m_verbose {
+                            std::cout << "Found (summits.size())$ summits" << std::endl;
+                        }
+                        total += summits.size();
+                    }
+                }
+            }
+            return total;
         }
     }
 }
