@@ -15,10 +15,14 @@ Day9: namespace = {
             total: i64 = 0;
             fileid: int = 0;
             disk: std::vector<std::optional<int>> = ();
+            gaps: std::unordered_map<int,std::set<int>> = ();
+            file_sizes: std::vector<std::pair<int, int>> = ();
+            gap_sizes: std::unordered_map<int,int> = ();
 
             file_next := true;
             for m_lines[0] do (ch) {
                 val: int = ch - '0';
+                fileloc := disk.size();
                 for 0..<val do (_) {
                     if file_next {
                         disk.push_back(fileid);
@@ -28,7 +32,14 @@ Day9: namespace = {
                     }
                 }
                 if file_next {
+                    file_sizes.push_back(std::pair(fileloc, val));
                     fileid++;
+                }
+                else {
+                    for 0..<val do (siz) {
+                        _ = gaps[siz+1].insert(fileloc);
+                    }
+                    gap_sizes[fileloc] = val;
                 }
                 file_next = !file_next;
             }
@@ -38,33 +49,71 @@ Day9: namespace = {
             }
 
             // And now defrag it.
-            offset : size_t = 0;
-            while offset < disk.size() {
-                if disk[offset] != std::nullopt {
-                    offset++;
-                    continue;
-                }
-                // We have a gap. Grab the end and move it forward.
-                disk[offset] = disk[disk.size()-1];
-                assert(disk[offset] != std::nullopt);
-                disk.resize(disk.size()-1);
-                while disk[disk.size()-1] == std::nullopt {
-                    disk.resize(disk.size()-1);
-                }
-                if m_verbose {
-                    std::cout << "Disk now: (disk)$" << std::endl;
-                }
-                offset++;
-            }
+            if m_part_two {
+                // Defrag by file.
+                for 0..<fileid do (revfile) {
+                    file_to_move := fileid - 1 - revfile;
+                    fileloc := file_sizes[file_to_move].first;
+                    filesize := file_sizes[file_to_move].second;
 
+                    // So now we see where the lowest gap is.
+                    gapiter := gaps[filesize].begin();
+                    if gapiter != gaps[filesize].end() && gapiter* < fileloc {
+                        // We have a place to move the file to. Let's do this.
+                        newloc := gapiter*;
+                        for 0..<filesize do (offset) {
+                            assert(disk[newloc+offset] == std::nullopt);
+                            disk[newloc+offset] = file_to_move;
+                            disk[fileloc+offset] = std::nullopt;
+                        }
+                        // Now we have to get rid of the reference to the old gap and put in a reference to the new one. (Note that we don't have to do that for the old location because it's to the right of all existing locations.)
+                        assert(gap_sizes.count(newloc));
+                        old_size := gap_sizes[newloc];
+                        _ = gap_sizes.erase(newloc);
+                        for 0..<old_size do (siz) {
+                            assert(gaps[siz+1].count(newloc));
+                            _ = gaps[siz+1].erase(newloc);
+                        }
+                        new_size := old_size - filesize;
+                        newloc += filesize;
+                        if new_size > 0 {
+                            // Now mark the new gap.
+                            gap_sizes[newloc] = new_size;
+                            for 0..<new_size do (siz) {
+                                _ = gaps[siz+1].insert(newloc);
+                            }
+                        }
+                        if m_verbose {
+                            std::cout << "Disk now: (disk)$" << std::endl;
+                        }
+                    }
+                }
+            }
+            else {
+                // Defrag by block.
+                offset : size_t = 0;
+                while offset < disk.size() {
+                    if disk[offset] != std::nullopt {
+                        offset++;
+                        continue;
+                    }
+                    // We have a gap. Grab the end and move it forward.
+                    disk[offset] = disk[disk.size()-1];
+                    assert(disk[offset] != std::nullopt);
+                    disk.resize(disk.size()-1);
+                    while disk[disk.size()-1] == std::nullopt {
+                        disk.resize(disk.size()-1);
+                    }
+                    if m_verbose {
+                        std::cout << "Disk now: (disk)$" << std::endl;
+                    }
+                    offset++;
+                }
+            }
 
             for 0..<disk.size() do (i) {
                 if disk[i] != std::nullopt {
                     total += i * disk[i]*;
-                }
-                else {
-                    // After defrag we should uncomment this.
-                    assert(false);
                 }
             }
 
