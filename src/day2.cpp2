@@ -64,9 +64,9 @@ Day2: namespace = {
             }
         }
 
-        run : (override inout this) -> int = {
+        run : (override inout this) -> i64 = {
             
-            total : int = 0;
+            total : i64 = 0;
 
             for m_lines do (line) {
                 // Each line contains 'Game <number>: <turn>; <turn>; <turn>'

@@ -154,8 +154,8 @@ Day6: namespace = {
         }
 
 
-        run : (override inout this) -> int = {
-            total: int = 0;
+        run : (override inout this) -> i64 = {
+            total: i64 = 0;
 
             // First put a boundary around the map to make sure we don't overstep. 
             for 0..<m_lines.size() do (y) {

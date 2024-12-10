@@ -47,7 +47,7 @@ Advent2024: namespace = {
             m_verbose = verbose;
             m_argint = argint;
         }
-        run : (virtual inout this) -> int;
+        run : (virtual inout this) -> i64;
         operator=: (virtual move this) = {}
     }
 

@@ -12,9 +12,9 @@ Day5: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
-        run : (override inout this) -> int = {
+        run : (override inout this) -> i64 = {
             
-            total : int = 0;
+            total : i64 = 0;
             rules : std::unordered_map<int, std::unordered_map<int, bool>> = ();
             rules_p :=  bp::int_ % "|";
             updates_p :=  bp::int_ % ",";

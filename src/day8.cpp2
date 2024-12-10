@@ -11,8 +11,8 @@ Day8: namespace = {
 
         coords: type == std::pair<int,int>;
 
-        run : (override inout this) -> int = {
-            total: int = 0;
+        run : (override inout this) -> i64 = {
+            total: i64 = 0;
             antennae : std::unordered_map<i8,std::vector<coords>> = ();
             antinodes : std::unordered_set<int> = ();
 

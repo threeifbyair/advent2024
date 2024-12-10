@@ -56,7 +56,7 @@ Day7: namespace = {
             }
         }
 
-        run : (override inout this) -> int = {
+        run : (override inout this) -> i64 = {
             total : ulong = 0;
             rule :=  bp::ulong_ >> bp::lit(":") >> +bp::ulong_;
 
@@ -76,8 +76,7 @@ Day7: namespace = {
                     }
                 }
             }
-            std::cout << "Real total is (total)$" << std::endl;
-            return 0;
+            return total;
         }
     }
 }
