@@ -1,5 +1,8 @@
 export module Day11;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day11: namespace = {
     export day : type = {
@@ -9,9 +12,58 @@ Day11: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        blink : (numberlist: std::vector<ulong>) -> std::vector<ulong> = {
+            retval : std::vector<ulong> = ();
+
+            for numberlist do (number) {
+                if number == 0 {
+                    retval.push_back(1);
+                }
+                else {
+                    digits := 0;
+                    divnum := number;
+                    power := 1;
+                    while divnum {
+                        digits++;
+                        divnum /= 10;
+                        if (digits & 1) == 0 {
+                            power *= 10;
+                        }
+                    }
+                    if digits & 1 {
+                        retval.push_back(number * 2024);
+                    }
+                    else {
+                        retval.push_back(number / power);
+                        retval.push_back(number % power);
+                    }
+                }
+            }
+
+            return retval;
+        }
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total : ulong = 0;
+
+            numberlist_p : std::optional<std::vector<ulong>> = bp::parse(m_lines[0], +bp::ulong_, bp::ws);
+            assert(numberlist_p);
+            numberlist := numberlist_p*;
+
+            if m_argint == 0 {
+                m_argint = 25;
+            }
+
+            for 0..<m_argint do (_) {
+                numberlist = blink(numberlist);
+                if m_verbose {
+                    std::cout << "(numberlist.size())$ stones: (numberlist)$" << std::endl;
+                }
+            }
+
+            total = numberlist.size();
+
+            return total;
         }
     }
 }
