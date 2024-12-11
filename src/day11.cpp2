@@ -7,9 +7,80 @@ bp: namespace == boost::parser;
 Day11: namespace = {
     export day : type = {
         this: Advent2024::day;
+        m_blink_cache : std::unordered_map<ulong, ulong> = ();
 
         operator= : (out this,  lines, part_two, verbose, argint) = {
             Advent2024::day = (lines, part_two, verbose, argint);
+        }
+
+        even_digits: (number: ulong) -> ulong = {
+            assert(number > 0UL);
+            if number < 10UL {
+                return 0;
+            }
+            if number < 100UL {
+                return 10;
+            }
+            if number < 1000UL {
+                return 0;
+            }
+            if number < 10000UL {
+                return 100;
+            }
+            if number < 100000UL {
+                return 0;
+            }
+            if number < 1000000UL {
+                return 1000;
+            }
+            if number < 10000000UL {
+                return 0;
+            }
+            if number < 100000000UL {
+                return 10000;
+            }
+            if number < 1000000000UL {
+                return 0;
+            }
+            if number < 10000000000UL {
+                return 100000;
+            }
+            if number < 100000000000UL {
+                return 0;
+            }
+            if number < 1000000000000UL {
+                return 1000000;
+            }
+            if number < 10000000000000UL {
+                return 0;
+            }
+            assert(false);
+            return 0;
+        }
+
+        blink2: (inout this, number: ulong, repeats: ulong) -> ulong = {
+            if repeats == 0 {
+                return 1;
+            }
+            blink_hash := (number << 8) | repeats;
+            retval : ulong = 0;
+            if m_blink_cache.count(blink_hash) {
+                return m_blink_cache[blink_hash];
+            }
+            if number == 0 {
+                retval = blink2(1, repeats-1);
+            }
+            else {
+                split_val := even_digits(number);
+                if split_val {
+                    retval = blink2(number/split_val, repeats-1) + blink2(number%split_val, repeats-1);
+                }
+                else {
+                    retval = blink2(number*2024, repeats-1);
+                }
+            }
+            m_blink_cache[blink_hash] = retval;
+            return retval;
         }
 
         blink : (numberlist: std::vector<ulong>) -> std::vector<ulong> = {
@@ -51,18 +122,30 @@ Day11: namespace = {
             numberlist := numberlist_p*;
 
             if m_argint == 0 {
-                m_argint = 25;
-            }
-
-            for 0..<m_argint do (_) {
-                numberlist = blink(numberlist);
-                if m_verbose {
-                    std::cout << "(numberlist.size())$ stones: (numberlist)$" << std::endl;
+                if m_part_two {
+                    m_argint = 75;
+                }
+                else {
+                    m_argint = 25;
                 }
             }
 
-            total = numberlist.size();
+            if m_part_two {
+                total = 0;
+                for numberlist do (number) {
+                    total += blink2(number, m_argint);
+                }
+            }
+            else {
+                for 0..<m_argint do (num_blinks) {
+                    numberlist = blink(numberlist);
+                    if m_verbose {
+                        std::cout << "After (num_blinks+1)$ blinks: (numberlist.size())$ stones" << std::endl;
+                    }
+                }
 
+                total = numberlist.size();
+            }
             return total;
         }
     }
