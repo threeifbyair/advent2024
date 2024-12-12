@@ -4,14 +4,87 @@ import Advent2024;
 Day12: namespace = {
     export day : type = {
         this: Advent2024::day;
+        m_unvisited: std::unordered_set<int> = ();
 
         operator= : (out this,  lines, part_two, verbose, argint) = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        try_explore: (inout this, x: int, y: int, plant: i8) -> (area: i64, perimeter: i64) = {
+            localplant := m_lines[y][x];
+            if plant == localplant {
+                // This is part of the same region. Explore!
+                location := (x << 16) | y;
+                if !m_unvisited.count(location) {
+                    // We've been here. Don't explore further.
+                    area = 0;
+                    perimeter = 0;
+                }
+                else {
+                    result := explore(location);
+                    area = result.area;
+                    perimeter = result.perimeter;
+                }
+            }
+            else {
+                // This is a region boundary.
+                area = 0;
+                perimeter = 1;
+            }
+        }
+
+        explore: (inout this, location: int) -> (area: i64, perimeter: i64) = {
+            x :int = location >> 16;
+            y :int = location & 0xFFFF;
+            plant := m_lines[y][x];
+            if m_verbose {
+                std::cout << "Exploring ((x)$, (y)$) with plant (plant)$..." << std::endl;
+            }
+            _ = m_unvisited.erase(location);
+            north := this.try_explore(x, y-1, plant);
+            east := this.try_explore(x+1, y, plant);
+            south := this.try_explore(x, y+1, plant);
+            west := this.try_explore(x-1, y, plant);
+            area = 1 + north.area + east.area + south.area + west.area;
+            perimeter = north.perimeter + east.perimeter + south.perimeter + west.perimeter;
+            if m_verbose {
+                std::cout << "Area (area)$, perimeter (perimeter)$" << std::endl;
+            }
+        }
+
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total: i64 = 0;
+
+            // First put a boundary around the map to make sure we don't overstep. 
+            for 0..<m_lines.size() do (y) {
+                m_lines[y] = "*" + m_lines[y] + "*";
+            }
+            linelen := m_lines[0].size();
+            boundary := std::string(linelen, '*');
+            _ = m_lines.insert(m_lines.begin(), boundary);
+            _ = m_lines.insert(m_lines.end(), boundary);
+
+            // First we map out all the locations as unvisited.
+            for 1..<m_lines.size()-1 do (y) {
+                for 1..<m_lines[1].size()-1 do (x) {
+                    _ = m_unvisited.insert((x << 16) | y);
+                }
+            }
+
+            while m_unvisited.size() {
+                visit := m_unvisited.begin()*;
+                if m_verbose {
+                    std::cout << "Starting region at ((visit >> 16)$, (visit & 0xFFFF)$), unvisited (m_unvisited.size())$..." << std::endl; 
+                }
+                visit_result := explore(visit);
+                if m_verbose {
+                    std::cout << "Region area (visit_result.area)$, perimeter (visit_result.perimeter)$, price (visit_result.area * visit_result.perimeter)$" << std::endl;
+                }
+                total += visit_result.area * visit_result.perimeter;
+            }
+
+            return total;
         }
     }
 }
