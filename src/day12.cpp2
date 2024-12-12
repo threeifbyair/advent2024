@@ -10,7 +10,7 @@ Day12: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
-        try_explore: (inout this, x: int, y: int, plant: i8) -> (area: i64, perimeter: i64) = {
+        try_explore: (inout this, x: int, y: int, plant: i8, prevx: int, prevy: int, boundx: int, boundy: int) -> (area: i64, perimeter: i64) = {
             localplant := m_lines[y][x];
             if plant == localplant {
                 // This is part of the same region. Explore!
@@ -29,7 +29,18 @@ Day12: namespace = {
             else {
                 // This is a region boundary.
                 area = 0;
-                perimeter = 1;
+                if m_part_two {
+                    // This only adds to the perimeter if it's not a continuation of a preceding side.
+                    if m_lines[prevy][prevx] == plant && m_lines[boundy][boundx] != plant {
+                        perimeter = 0;
+                    }
+                    else {
+                        perimeter = 1;
+                    }
+                }
+                else {
+                    perimeter = 1;
+                }
             }
         }
 
@@ -41,10 +52,10 @@ Day12: namespace = {
                 std::cout << "Exploring ((x)$, (y)$) with plant (plant)$..." << std::endl;
             }
             _ = m_unvisited.erase(location);
-            north := this.try_explore(x, y-1, plant);
-            east := this.try_explore(x+1, y, plant);
-            south := this.try_explore(x, y+1, plant);
-            west := this.try_explore(x-1, y, plant);
+            north := this.try_explore(x, y-1, plant, x-1, y, x-1, y-1);
+            east := this.try_explore(x+1, y, plant, x, y-1, x+1, y-1);
+            south := this.try_explore(x, y+1, plant, x+1, y, x+1, y+1);
+            west := this.try_explore(x-1, y, plant, x, y+1, x-1, y+1);
             area = 1 + north.area + east.area + south.area + west.area;
             perimeter = north.perimeter + east.perimeter + south.perimeter + west.perimeter;
             if m_verbose {
