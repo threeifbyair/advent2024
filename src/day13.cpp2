@@ -5,6 +5,56 @@ import parser;
 bp: namespace == boost::parser;
 
 Day13: namespace = {
+    rational: /*<T: type>*/ type = {
+        T: type == i64;
+        public num: T;
+        public denom: T;
+
+        operator=: (out this) = { num = T(0); denom = T(1); }
+        operator=: (out this, num_: T, denom_ : T) = { num = num_; denom = denom_; }
+        operator=: (implicit out this, num_: T) = { num = num_; denom = T(1); }
+        operator=: (out this, that) = {num = that.num; denom = that.denom; }
+
+        normalize: (this) -> rational/*<T>*/ = {
+            newnum : T = std::abs(num);
+            newdenom: T = std::abs(denom);
+            sign: T = 1;
+            if (num < 0) ^ (denom < 0) {
+                sign = -1;
+            }
+            factor := std::gcd(newnum, newdenom);
+            return rational/*<T>*/(sign * newnum / factor, newdenom / factor);
+        }
+
+        numerator: (this) -> T = num;
+        denominator: (this) -> T = denom;
+
+        operator+: (a: rational/*<T>*/, b: rational/*<T>*/) -> rational/*<T>*/ = { 
+            // p/q + r/s = (ps + qr) / rs
+            result:= rational/*<T>*/(a.num * b.denom + b.num * a.denom, a.denom * b.denom);
+            return result.normalize();
+        }
+
+        operator-: (a: rational/*<T>*/, b: rational/*<T>*/) -> rational/*<T>*/ = { 
+            // p/q - r/s = (ps - qr) / rs
+            result:= rational/*<T>*/(a.num * b.denom - b.num * a.denom, a.denom * b.denom);
+            return result.normalize();
+        }
+
+        operator*: (a: rational/*<T>*/, b: rational/*<T>*/) -> rational/*<T>*/ = { 
+            // p/q * r/s = pr / qs
+            result:= rational/*<T>*/(a.num * b.num, a.denom * b.denom);
+            return result.normalize();
+        }
+
+        operator/: (a: rational/*<T>*/, b: rational/*<T>*/) -> rational/*<T>*/ = { 
+            // p/q / r/s = ps / qr
+            result:= rational/*<T>*/(a.num * b.denom, b.num * a.denom);
+            return result.normalize();
+        }
+    }
+
+    rsize_t: type == rational/*<size_t>*/;
 
     export day : type = {
         this: Advent2024::day;
@@ -30,6 +80,11 @@ Day13: namespace = {
             button_b_p := bp::lit("Button B: X+") >> bp::ulong_ >> bp::lit(", Y+") >> bp::ulong_;
             prize_p := bp::lit("Prize: X=") >> bp::ulong_ >> bp::lit(", Y=") >> bp::ulong_;
 
+            prize_bump : size_t = 0UL;
+            if m_part_two {
+                prize_bump += 10000000000000UL;
+            }
+
             lineno : size_t = 0;
             while lineno < m_lines.size() {
                 this_game: game = game(coords(0UL,0UL), coords(0UL,0UL), coords(0UL,0UL));
@@ -53,34 +108,45 @@ Day13: namespace = {
                     std::cerr << "Parsing failure 3 on line (lineno)$: *(m_lines[lineno])$*!" << std::endl;
                     exit(1);
                 }
-                this_game.prize.x = parse_result.first;
-                this_game.prize.y = parse_result.second;
+                this_game.prize.x = parse_result.first + prize_bump;
+                this_game.prize.y = parse_result.second + prize_bump;
 
                 lineno += 2; // skip the blank line
 
-                price: std::optional<size_t> = std::nullopt;
+                // Let's think about the math for part two.
+                // We're looking for numbers a and b such that
+                // ap + bq = X
+                // ar + bs = Y
+                // Where we're given p,q,r,s,X,Y
 
-                for 0..<101 do (a_moves: size_t) {
-                    this_price :size_t = a_moves * 3;
-                    curr_x := this_game.button_a.x * a_moves;
-                    curr_y := this_game.button_a.y * a_moves;
+                // ap = X-bq
+                // a = (X - bq)/p
+                // ar = Y-bs
+                // a = (Y - bs)/r
 
-                    remaining_x := this_game.prize.x - curr_x;
-                    remaining_y := this_game.prize.y - curr_y;
+                // So... (X-bq)/p = (Y-bs)/r
+                // r(X-bq) = p(Y-bs)
+                // rX - (qr)b = pY - (ps)b
+                // b(ps - qr) = pY - rX
+                // b = (pY - rX)/(ps - qr)
+                // by similar methods
+                // a = (sX - qY)/(ps - qr)
 
-                    assert(this_game.button_b.x != 0 && this_game.button_b.y != 0);
+                p: size_t = this_game.button_a.x;
+                q: size_t = this_game.button_b.x;
+                r: size_t = this_game.button_a.y;
+                s: size_t = this_game.button_b.y;
+                X: size_t = this_game.prize.x;
+                Y: size_t = this_game.prize.y;
 
-                    if remaining_x % this_game.button_b.x == 0 && remaining_y % this_game.button_b.y == 0 && remaining_x / this_game.button_b.x == remaining_y / this_game.button_b.y {
-                        // We have a solution!
-                        b_moves := remaining_x / this_game.button_b.x;
-                        this_price += b_moves;
-                        if b_moves <= 100UL && (price == std::nullopt || price* > this_price) {
-                            price = this_price;
-                        } 
-                    }
-                }
-                if price != std::nullopt {
-                    total += price*;
+                assert (p*s != q*r);
+                determinant := p*s - q*r;
+
+                rb: rsize_t = rsize_t(p*Y - r*X, determinant).normalize();
+                ra: rsize_t = rsize_t(s*X - q*Y, determinant).normalize();
+
+                if ra.denominator() == 1 && rb.denominator() == 1 {
+                    total += ra.numerator() * 3 + rb.numerator();
                 }
             }
             return total;
