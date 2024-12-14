@@ -1,7 +1,11 @@
 export module Day13;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day13: namespace = {
+
     export day : type = {
         this: Advent2024::day;
 
@@ -9,9 +13,77 @@ Day13: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        coords: @struct type = {
+            x: size_t;
+            y: size_t;
+        }
+
+        game: @struct type = {
+            button_a: coords;
+            button_b: coords;
+            prize: coords;
+        }
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total : i64 = 0;
+            button_a_p := bp::lit("Button A: X+") >> bp::ulong_ >> bp::lit(", Y+") >> bp::ulong_;
+            button_b_p := bp::lit("Button B: X+") >> bp::ulong_ >> bp::lit(", Y+") >> bp::ulong_;
+            prize_p := bp::lit("Prize: X=") >> bp::ulong_ >> bp::lit(", Y=") >> bp::ulong_;
+
+            lineno : size_t = 0;
+            while lineno < m_lines.size() {
+                this_game: game = game(coords(0UL,0UL), coords(0UL,0UL), coords(0UL,0UL));
+
+                parse_result : std::pair<size_t,size_t> = (0UL,0UL);
+                if !bp::parse(m_lines[lineno], button_a_p, parse_result) {
+                    std::cerr << "Parsing failure 1 on line (lineno)$: *(m_lines[lineno])$*!" << std::endl;
+                    exit(1);
+                }
+                this_game.button_a.x = parse_result.first;
+                this_game.button_a.y = parse_result.second;
+                
+                if !bp::parse(m_lines[lineno++], button_b_p, parse_result) {
+                    std::cerr << "Parsing failure 2 on line (lineno)$: *(m_lines[lineno])$*!" << std::endl;
+                    exit(1);
+                }
+                this_game.button_b.x = parse_result.first;
+                this_game.button_b.y = parse_result.second;
+
+                if !bp::parse(m_lines[lineno++], prize_p, parse_result) {
+                    std::cerr << "Parsing failure 3 on line (lineno)$: *(m_lines[lineno])$*!" << std::endl;
+                    exit(1);
+                }
+                this_game.prize.x = parse_result.first;
+                this_game.prize.y = parse_result.second;
+
+                lineno += 2; // skip the blank line
+
+                price: std::optional<size_t> = std::nullopt;
+
+                for 0..<101 do (a_moves: size_t) {
+                    this_price :size_t = a_moves * 3;
+                    curr_x := this_game.button_a.x * a_moves;
+                    curr_y := this_game.button_a.y * a_moves;
+
+                    remaining_x := this_game.prize.x - curr_x;
+                    remaining_y := this_game.prize.y - curr_y;
+
+                    assert(this_game.button_b.x != 0 && this_game.button_b.y != 0);
+
+                    if remaining_x % this_game.button_b.x == 0 && remaining_y % this_game.button_b.y == 0 && remaining_x / this_game.button_b.x == remaining_y / this_game.button_b.y {
+                        // We have a solution!
+                        b_moves := remaining_x / this_game.button_b.x;
+                        this_price += b_moves;
+                        if b_moves <= 100UL && (price == std::nullopt || price* > this_price) {
+                            price = this_price;
+                        } 
+                    }
+                }
+                if price != std::nullopt {
+                    total += price*;
+                }
+            }
+            return total;
         }
     }
 }
