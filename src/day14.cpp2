@@ -1,7 +1,11 @@
 export module Day14;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day14: namespace = {
+
     export day : type = {
         this: Advent2024::day;
 
@@ -10,8 +14,63 @@ Day14: namespace = {
         }
 
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            
+            total : i64 = 0;
+
+            if m_argint == 0 {
+                m_argint = 1010103;
+            }
+
+            arena_x : int = m_argint / 10000;
+            midpoint_x : int = (arena_x - 1) / 2;
+            arena_y : int = m_argint % 10000;
+            midpoint_y : int = (arena_y - 1) / 2;
+
+            elapsed := 100;
+
+            robot_locs: std::vector<int> = (0, 0, 0, 0);
+
+            for m_lines do (line) {
+                // Each line contains p=<number>,<number> v=<number,number>'
+                line_p := bp::lit("p=") >> bp::int_ >> bp::lit(",") >> bp::int_ >> bp::lit(" v=") >> bp::int_ >> bp::lit(",") >> bp::int_;
+
+                game : std::tuple<int, int, int, int> = (0, 0, 0, 0);
+                if !bp::parse(line, line_p, game) {
+                    std::cerr << "Parsing failure on *(line)$*!" << std::endl;
+                    exit(1);
+                }
+                px: int = game.std::get<0>();
+                py: int = game.std::get<1>();
+                vx: int = game.std::get<2>();
+                vy: int = game.std::get<3>();
+                if m_verbose {
+                    std::cout << "Processing robot at ((px)$, (py)$), velocity ((vx)$, (vy)$)... " << std::endl;
+                }
+
+                final_x := (px + elapsed * vx) % arena_x;
+                if final_x < 0 {
+                    final_x += arena_x;
+                }
+                final_y := (py + elapsed * vy) % arena_y;
+                if final_y < 0 {
+                    final_y += arena_y;
+                }
+
+                if m_verbose {
+                    std::cout << "Final location at ((final_x)$, (final_y)$)" << std::endl;
+                }
+
+                if final_x != midpoint_x && final_y != midpoint_y {
+                    offset: int = (final_x > midpoint_x) + 2*(final_y > midpoint_y);
+                    robot_locs[offset]++;                    
+                    if m_verbose {
+                        std::cout << "Added to quadrant (offset)$, which now has (robot_locs[offset])$ robots" << std::endl;
+                    }
+                }
+
+            }
+            total = robot_locs[0] * robot_locs[1] * robot_locs[2] * robot_locs[3];
+            return total;
         }
     }
 }
