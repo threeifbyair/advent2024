@@ -13,6 +13,80 @@ Day14: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        coords: @struct type = {
+            x: int;
+            y: int;
+        }
+
+        robot_t: @struct type = {
+            p: coords;
+            v: coords;
+        }
+
+        grid_t: type == std::vector<std::vector<int>>;
+
+        m_robots: std::vector<robot_t> = ();
+        m_grid: grid_t = ();
+        m_arena_x: int = 0;
+        m_arena_y: int = 0;
+
+        print_grid: (this, elapsed: int) = {
+            std::cout << "After (elapsed)$ seconds: " << std::endl;
+            for m_grid do (line) {
+                for line do (entry) {
+                    output: i8 = '*';
+                    if entry == 0 {
+                        output = '.';
+                    }
+                    else if entry < 10 {
+                        output = '0' + unchecked_narrow<i8>(entry);
+                    }
+                    std::cout << output;
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+
+        advance_robots: (inout this) = {
+            for m_robots do (inout robot) {
+                m_grid[robot.p.y][robot.p.x]--;
+                robot.p.x += robot.v.x;
+                if robot.p.x >= m_arena_x {
+                    robot.p.x -= m_arena_x;
+                }
+                else if robot.p.x < 0 {
+                    robot.p.x += m_arena_x;
+                }
+                robot.p.y += robot.v.y;
+                if robot.p.y >= m_arena_y {
+                    robot.p.y -= m_arena_y;
+                }
+                else if robot.p.y < 0 {
+                    robot.p.y += m_arena_y;
+                }
+                m_grid[robot.p.y][robot.p.x]++;
+            }
+        }
+
+        could_be_tree: (this) -> bool = {
+            for m_grid do (line) {
+                seen_line := 0;
+                for line do (entry) {
+                    if entry == 0 {
+                        seen_line = 0;
+                    }
+                    else {
+                        seen_line++;
+                        if seen_line == 10 {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
         run : (override inout this) -> i64 = {
             
             total : i64 = 0;
@@ -21,55 +95,93 @@ Day14: namespace = {
                 m_argint = 1010103;
             }
 
-            arena_x : int = m_argint / 10000;
-            midpoint_x : int = (arena_x - 1) / 2;
-            arena_y : int = m_argint % 10000;
-            midpoint_y : int = (arena_y - 1) / 2;
-
-            elapsed := 100;
-
-            robot_locs: std::vector<int> = (0, 0, 0, 0);
+            m_arena_x  = m_argint / 10000;
+            m_arena_y = m_argint % 10000;
 
             for m_lines do (line) {
                 // Each line contains p=<number>,<number> v=<number,number>'
                 line_p := bp::lit("p=") >> bp::int_ >> bp::lit(",") >> bp::int_ >> bp::lit(" v=") >> bp::int_ >> bp::lit(",") >> bp::int_;
 
-                game : std::tuple<int, int, int, int> = (0, 0, 0, 0);
-                if !bp::parse(line, line_p, game) {
+                primitive_robot : std::tuple<int, int, int, int> = (0, 0, 0, 0);
+                if !bp::parse(line, line_p, primitive_robot) {
                     std::cerr << "Parsing failure on *(line)$*!" << std::endl;
                     exit(1);
                 }
-                px: int = game.std::get<0>();
-                py: int = game.std::get<1>();
-                vx: int = game.std::get<2>();
-                vy: int = game.std::get<3>();
+                robot := robot_t(coords(primitive_robot.std::get<0>(), primitive_robot.std::get<1>()), coords(primitive_robot.std::get<2>(), primitive_robot.std::get<3>()));
+
+                m_robots.push_back(robot);
+            }
+
+            if m_part_two {
+                // We have to find a lineup that looks like a 'Christmas tree'. Someone suggested
+                // looking for ten robots in a row horizontally. Let's see how we do! Regardless, 
+                // we don't need to go beyond 101*103 = 10403 seconds, so it's pretty tractable.
+
+                // First put our robots on a grid.
+                for 0..<m_arena_y do (_) {
+                    m_grid.push_back(std::vector<int>(m_arena_x, 0));
+                }
+
+                for m_robots do (robot) {
+                    m_grid[robot.p.y][robot.p.x]++;
+                }
+
                 if m_verbose {
-                    std::cout << "Processing robot at ((px)$, (py)$), velocity ((vx)$, (vy)$)... " << std::endl;
+                    print_grid(0);
                 }
-
-                final_x := (px + elapsed * vx) % arena_x;
-                if final_x < 0 {
-                    final_x += arena_x;
-                }
-                final_y := (py + elapsed * vy) % arena_y;
-                if final_y < 0 {
-                    final_y += arena_y;
-                }
-
-                if m_verbose {
-                    std::cout << "Final location at ((final_x)$, (final_y)$)" << std::endl;
-                }
-
-                if final_x != midpoint_x && final_y != midpoint_y {
-                    offset: int = (final_x > midpoint_x) + 2*(final_y > midpoint_y);
-                    robot_locs[offset]++;                    
+                for 0..< (m_arena_x*m_arena_y) do (elapsed) {
+                    if could_be_tree() {
+                        print_grid(elapsed);
+                        if total == 0 {
+                            total = elapsed;
+                        }
+                    }
                     if m_verbose {
-                        std::cout << "Added to quadrant (offset)$, which now has (robot_locs[offset])$ robots" << std::endl;
+                        if elapsed % 50 == 0 {
+                            std::cout << "Checked (elapsed)$ seconds..." << std::endl;
+                        }
+                    }
+                    advance_robots();
+                }
+            }
+            else {
+                midpoint_x : int = (m_arena_x - 1) / 2;
+                midpoint_y : int = (m_arena_y - 1) / 2;
+                robot_locs: std::vector<int> = (0, 0, 0, 0);
+
+                elapsed := 100;
+                for m_robots do (robot) {
+                    px: int = robot.p.x;
+                    py: int = robot.p.y;
+                    vx: int = robot.v.x;
+                    vy: int = robot.v.y;
+                    if m_verbose {
+                        std::cout << "Processing robot at ((px)$, (py)$), velocity ((vx)$, (vy)$)... " << std::endl;
+                    }
+
+                    final_x := (px + elapsed * vx) % m_arena_x;
+                    if final_x < 0 {
+                        final_x += m_arena_x;
+                    }
+                    final_y := (py + elapsed * vy) % m_arena_y;
+                    if final_y < 0 {
+                        final_y += m_arena_y;
+                    }
+
+                    if m_verbose {
+                        std::cout << "Final location at ((final_x)$, (final_y)$)" << std::endl;
+                    }
+
+                    if final_x != midpoint_x && final_y != midpoint_y {
+                        offset: int = (final_x > midpoint_x) + 2*(final_y > midpoint_y);
+                        robot_locs[offset]++;                    
+                        if m_verbose {
+                            std::cout << "Added to quadrant (offset)$, which now has (robot_locs[offset])$ robots" << std::endl;
+                        }
                     }
                 }
-
+                total = robot_locs[0] * robot_locs[1] * robot_locs[2] * robot_locs[3];
             }
-            total = robot_locs[0] * robot_locs[1] * robot_locs[2] * robot_locs[3];
             return total;
         }
     }
