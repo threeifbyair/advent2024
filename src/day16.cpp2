@@ -14,11 +14,17 @@ Day16: namespace = {
             y: int;
         }
 
+        path: @struct type = {
+            position: coords;
+            direction: coords;
+            visited: std::shared_ptr<std::vector<coords>>;
+        }
+
         grid_t: type == std::vector<std::vector<char>>;
 
         m_grid: grid_t = ();
         m_moves: std::unordered_map<int64_t, int> = ();
-        m_scores: std::map<int, std::vector<int64_t>> = ();
+        m_scores: std::map<int, std::vector<path>> = ();
 
         make_hash: (position: coords, direction: coords) -> int64_t = (position.x) | (position.y << 12) | ((direction.x+1) << 24) | ((direction.y+1) << 28);
         unmake_hash: (hash: int64_t) -> (position: coords, direction: coords) = {
@@ -29,79 +35,43 @@ Day16: namespace = {
             direction.x = ((hash >> 24) & 0x3) - 1;
             direction.y = ((hash >> 28) & 0x3) - 1;
         }
-        
-        find_best_move_v1: (inout this, position: coords, direction: coords, depth: int) -> int = {
-            hash: int64_t = make_hash(position, direction);
-            if m_moves.count(hash) {
-                //std::cout << std::string(depth, ' ') << "Already found from ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$) -- score is (m_moves[hash])$" << std::endl;
-                return m_moves[hash];
-            }
-            if m_grid[position.y][position.x] == 'E' {
-                // We got to the end!
-                //std::cout << std::string(depth, ' ') << "Found the end at ((position.x)$, (position.y)$)!" << std::endl;
-                return 0;
-            }
-            //std::cout << std::string(depth, ' ') << "Looking at ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$)..." << std::endl;
-            best := 999999;
-            m_moves[hash] = best;    // make sure we don't over-recurse
-            if m_grid[position.y+direction.y][position.x+direction.x] != '#' {
-                //std::cout << std::string(depth, ' ') << "Recursing to ((position.x+direction.x)$, (position.y+direction.y)$) facing ((direction.x)$, (direction.y)$)..." << std::endl;
-                attempt := find_best_move(coords(position.x+direction.x, position.y+direction.y), direction, depth+2) + 1;
-                //std::cout << std::string(depth, ' ') << "Score is (attempt)$" << std::endl;
-                if attempt < best {
-                    best = attempt;
-                }
-            } 
-            //std::cout << std::string(depth, ' ') << "Recursing to ((position.x)$, (position.y)$) facing ((direction.y)$, (direction.x)$)..." << std::endl;
-            attempt := find_best_move(coords(position.x, position.y), coords(direction.y, direction.x), depth+2) + 1000;
-            //std::cout << std::string(depth, ' ') << "Score is (attempt)$" << std::endl;
-            if attempt < best {
-                best = attempt;
-            }
-            //std::cout << std::string(depth, ' ') << "Recursing to ((position.x)$, (position.y)$) facing ((-direction.y)$, (-direction.x)$)..." << std::endl;
-            attempt = find_best_move(coords(position.x, position.y), coords(-direction.y, -direction.x), depth+2) + 1000;
-            //std::cout << std::string(depth, ' ') << "Score is (attempt)$" << std::endl;
-            if attempt < best {
-                best = attempt;
-            }
-            //std::cout << std::string(depth, ' ') << "Remembering best score ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$) is (best)$" << std::endl;
-            m_moves[hash] = best;
-            return best; 
-        }
 
-        find_best_move: (inout this, position: coords, direction: coords, depth: int) -> int = {
-            m_scores[0] = (make_hash(position, direction));
-            while m_scores.size() {
+        find_best_move: (inout this, position: coords, direction: coords) -> int = {
+            m_scores[0] = (path(position, direction, shared.new<std::vector<coords>>(position)));
+            winning_paths: std::vector<path> = ();
+            winning_score: int = 0;
+            while !winning_paths.size() {
+                assert(m_scores.size() > 0UL);
                 iter := m_scores.begin();
                 score := iter*.first;
-                hashes := iter*.second;
+                paths := iter*.second;
                 _ = m_scores.erase(score);
-                for hashes do (hash) {
-                    loc := unmake_hash(hash);
+                for paths do (path_) {
                     if m_verbose {
-                        std::cout << "Score (score)$: at ((loc.position.x)$, (loc.position.y)$) facing ((loc.direction.x)$, (loc.direction.y)$)" << std::endl;
+                        std::cout << "Score (score)$: at ((path_.position.x)$, (path_.position.y)$) facing ((path_.direction.x)$, (path_.direction.y)$)" << std::endl;
                     }
-                    if m_grid[loc.position.y][loc.position.x] == 'E' {
-                        // We're done!
-                        return score;
+                    if m_grid[path_.position.y][path_.position.x] == 'E' {
+                        // We're done! (But we have to check others that tie.)
+                        winning_score = score;
+                        winning_paths.push_back(path_);
                     }
-                    partial_hash := make_hash(loc.position, coords(0,0));
+                    partial_hash := make_hash(path_.position, coords(0,0));
                     if !m_moves.count(partial_hash) {
                         // We haven't been here before. Explore the whole thing.
                         m_moves[partial_hash] = score;
                         if m_verbose {
                             std::cout << "Not seen, fully exploring..." << std::endl;
                         }
-                        explore(coords(loc.position.x + loc.direction.x, loc.position.y + loc.direction.y), loc.direction, score+1);
-                        explore(coords(loc.position.x, loc.position.y), coords(loc.direction.y, loc.direction.x), score+1000);
-                        explore(coords(loc.position.x, loc.position.y), coords(-loc.direction.y, -loc.direction.x), score+1000);
+                        explore(coords(path_.position.x + path_.direction.x, path_.position.y + path_.direction.y), path_.direction, path_.visited*, score+1);
+                        explore(coords(path_.position.x, path_.position.y), coords(path_.direction.y, path_.direction.x), path_.visited*, score+1000);
+                        explore(coords(path_.position.x, path_.position.y), coords(-path_.direction.y, -path_.direction.x), path_.visited*, score+1000);
                     }
                     else if m_moves[partial_hash] >= score - 1000 {
                         // Explore forward only.
                         if m_verbose {
                             std::cout << "Seen with score (m_moves[partial_hash])$, exploring forward only..." << std::endl;
                         }
-                        explore(coords(loc.position.x + loc.direction.x, loc.position.y + loc.direction.y), loc.direction, score+1);
+                        explore(coords(path_.position.x + path_.direction.x, path_.position.y + path_.direction.y), path_.direction, path_.visited*, score+1);
                     }
                     else {
                         if m_verbose {
@@ -110,16 +80,49 @@ Day16: namespace = {
                     }
                 }
             }
-            assert(false); 
-            return 0;
+            // OK. We have a winning score.
+            if m_part_two {
+                visited : std::unordered_set<int64_t> = ();
+                for winning_paths do (path_) {
+                    for path_.visited* do (loc) {
+                        partial_hash := make_hash(loc, coords(0,0));
+                        _ = visited.insert(partial_hash);
+                        m_grid[loc.y][loc.x] = 'O';
+                    }
+                }
+                if m_verbose {
+                    print_grid();
+                }
+                return visited.size();
+            }
+            else {
+                return winning_score;
+            }
         }
 
-        explore: (inout this, position: coords, direction: coords, score: int) = {
+        explore: (inout this, position: coords, direction: coords, inpath: std::vector<coords>, score: int) = {
             if m_grid[position.y][position.x] != '#' {
-                hash := make_hash(position, direction);
-                m_scores[score].push_back(hash);
-                if m_verbose {
-                    std::cout << "Exploring to ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$) with score (score)$" << std::endl;
+                visited := shared.new<std::vector<coords>>();
+                _ = visited*.insert(visited*.end(), inpath.begin(), inpath.end());
+                visited*.push_back(position);
+                outpath := path(position, direction, visited); 
+                // Before we just add ourselves, let's see if there's someone else doing it too.
+                found: bool = false;
+                for m_scores[score] do (inout path_) {
+                    if path_.position == position && path_.direction == direction {
+                        found = true;
+                        _ = path_.visited*.insert(path_.visited*.end(), visited*.begin(), visited*.end());
+                        if m_verbose {
+                            std::cout << "Exploring to ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$) with score (score)$ by hitching a ride" << std::endl;
+                        }
+                        break;
+                    }
+                }
+                if !found {
+                    m_scores[score].push_back(outpath);
+                    if m_verbose {
+                        std::cout << "Exploring to ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$) with score (score)$" << std::endl;
+                    }
                 }
             }
         }
@@ -158,7 +161,7 @@ Day16: namespace = {
                 print_grid();
             }
             direction := coords(1, 0);
-            total = find_best_move(reindeer, direction, 2);
+            total = find_best_move(reindeer, direction);
             return total;
         }
     }
