@@ -9,9 +9,157 @@ Day16: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        coords: @struct @ordered type = {
+            x: int;
+            y: int;
+        }
+
+        grid_t: type == std::vector<std::vector<char>>;
+
+        m_grid: grid_t = ();
+        m_moves: std::unordered_map<int64_t, int> = ();
+        m_scores: std::map<int, std::vector<int64_t>> = ();
+
+        make_hash: (position: coords, direction: coords) -> int64_t = (position.x) | (position.y << 12) | ((direction.x+1) << 24) | ((direction.y+1) << 28);
+        unmake_hash: (hash: int64_t) -> (position: coords, direction: coords) = {
+            position = coords(0,0);
+            direction = coords(0,0);
+            position.x = hash & 0xFFF;
+            position.y = (hash >> 12) & 0xFFF;
+            direction.x = ((hash >> 24) & 0x3) - 1;
+            direction.y = ((hash >> 28) & 0x3) - 1;
+        }
+        
+        find_best_move_v1: (inout this, position: coords, direction: coords, depth: int) -> int = {
+            hash: int64_t = make_hash(position, direction);
+            if m_moves.count(hash) {
+                //std::cout << std::string(depth, ' ') << "Already found from ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$) -- score is (m_moves[hash])$" << std::endl;
+                return m_moves[hash];
+            }
+            if m_grid[position.y][position.x] == 'E' {
+                // We got to the end!
+                //std::cout << std::string(depth, ' ') << "Found the end at ((position.x)$, (position.y)$)!" << std::endl;
+                return 0;
+            }
+            //std::cout << std::string(depth, ' ') << "Looking at ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$)..." << std::endl;
+            best := 999999;
+            m_moves[hash] = best;    // make sure we don't over-recurse
+            if m_grid[position.y+direction.y][position.x+direction.x] != '#' {
+                //std::cout << std::string(depth, ' ') << "Recursing to ((position.x+direction.x)$, (position.y+direction.y)$) facing ((direction.x)$, (direction.y)$)..." << std::endl;
+                attempt := find_best_move(coords(position.x+direction.x, position.y+direction.y), direction, depth+2) + 1;
+                //std::cout << std::string(depth, ' ') << "Score is (attempt)$" << std::endl;
+                if attempt < best {
+                    best = attempt;
+                }
+            } 
+            //std::cout << std::string(depth, ' ') << "Recursing to ((position.x)$, (position.y)$) facing ((direction.y)$, (direction.x)$)..." << std::endl;
+            attempt := find_best_move(coords(position.x, position.y), coords(direction.y, direction.x), depth+2) + 1000;
+            //std::cout << std::string(depth, ' ') << "Score is (attempt)$" << std::endl;
+            if attempt < best {
+                best = attempt;
+            }
+            //std::cout << std::string(depth, ' ') << "Recursing to ((position.x)$, (position.y)$) facing ((-direction.y)$, (-direction.x)$)..." << std::endl;
+            attempt = find_best_move(coords(position.x, position.y), coords(-direction.y, -direction.x), depth+2) + 1000;
+            //std::cout << std::string(depth, ' ') << "Score is (attempt)$" << std::endl;
+            if attempt < best {
+                best = attempt;
+            }
+            //std::cout << std::string(depth, ' ') << "Remembering best score ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$) is (best)$" << std::endl;
+            m_moves[hash] = best;
+            return best; 
+        }
+
+        find_best_move: (inout this, position: coords, direction: coords, depth: int) -> int = {
+            m_scores[0] = (make_hash(position, direction));
+            while m_scores.size() {
+                iter := m_scores.begin();
+                score := iter*.first;
+                hashes := iter*.second;
+                _ = m_scores.erase(score);
+                for hashes do (hash) {
+                    loc := unmake_hash(hash);
+                    if m_verbose {
+                        std::cout << "Score (score)$: at ((loc.position.x)$, (loc.position.y)$) facing ((loc.direction.x)$, (loc.direction.y)$)" << std::endl;
+                    }
+                    if m_grid[loc.position.y][loc.position.x] == 'E' {
+                        // We're done!
+                        return score;
+                    }
+                    partial_hash := make_hash(loc.position, coords(0,0));
+                    if !m_moves.count(partial_hash) {
+                        // We haven't been here before. Explore the whole thing.
+                        m_moves[partial_hash] = score;
+                        if m_verbose {
+                            std::cout << "Not seen, fully exploring..." << std::endl;
+                        }
+                        explore(coords(loc.position.x + loc.direction.x, loc.position.y + loc.direction.y), loc.direction, score+1);
+                        explore(coords(loc.position.x, loc.position.y), coords(loc.direction.y, loc.direction.x), score+1000);
+                        explore(coords(loc.position.x, loc.position.y), coords(-loc.direction.y, -loc.direction.x), score+1000);
+                    }
+                    else if m_moves[partial_hash] >= score - 1000 {
+                        // Explore forward only.
+                        if m_verbose {
+                            std::cout << "Seen with score (m_moves[partial_hash])$, exploring forward only..." << std::endl;
+                        }
+                        explore(coords(loc.position.x + loc.direction.x, loc.position.y + loc.direction.y), loc.direction, score+1);
+                    }
+                    else {
+                        if m_verbose {
+                            std::cout << "Seen with score (m_moves[partial_hash])$, no point in exploring" << std::endl;
+                        }
+                    }
+                }
+            }
+            assert(false); 
+            return 0;
+        }
+
+        explore: (inout this, position: coords, direction: coords, score: int) = {
+            if m_grid[position.y][position.x] != '#' {
+                hash := make_hash(position, direction);
+                m_scores[score].push_back(hash);
+                if m_verbose {
+                    std::cout << "Exploring to ((position.x)$, (position.y)$) facing ((direction.x)$, (direction.y)$) with score (score)$" << std::endl;
+                }
+            }
+        }
+
+        print_grid: (this) = {
+            for m_grid do (line) {
+                for line do (entry) {
+                    std::cout << entry;
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total : i64 = 0;
+
+            for m_lines do (line) {
+                _ = m_grid.push_back(std::vector(line.begin(), line.end()));
+            }
+
+            // OK, let's get started. First find the start.
+            maybe_reindeer : std::optional<coords> = std::nullopt;
+            for 0..<m_grid.size() do (ry: int) {
+                for 0 ..< m_grid[ry].size() do (rx: int) {
+                    if m_grid[ry][rx] == 'S' {
+                        maybe_reindeer = coords(rx, ry);
+                        break;
+                    }
+                }
+            }
+            assert(maybe_reindeer);
+            reindeer := maybe_reindeer*;
+            if m_verbose {
+                print_grid();
+            }
+            direction := coords(1, 0);
+            total = find_best_move(reindeer, direction, 2);
+            return total;
         }
     }
 }
