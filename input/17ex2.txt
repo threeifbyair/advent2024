@@ -1,0 +1,5 @@
+Register A: 123456
+Register B: 654321
+Register C: 9
+
+Program: 2,6

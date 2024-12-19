@@ -1,0 +1,5 @@
+Register A: 2024
+Register B: 654321
+Register C: 987654
+
+Program: 0,1,5,4,3,0

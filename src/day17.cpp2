@@ -1,7 +1,157 @@
 export module Day17;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day17: namespace = {
+
+    opcode: @enum type = {
+        adv := 0;
+        bxl := 1;
+        bst := 2;
+        jnz := 3;
+        bxc := 4;
+        out := 5;
+        bdv := 6;
+        cdv := 7;
+    }
+
+    processor: type =
+    {
+        public ip: size_t;
+        public reg_a: size_t;
+        public reg_b: size_t;
+        public reg_c: size_t;
+        public imem: std::vector<size_t>;
+        public is_halted: bool = false;
+        public output: std::vector<size_t> = ();
+
+        to_string: (this) -> std::string = "IP: (ip)$  (disasm(ip))$  A=(reg_a)$ B=(reg_b)$ C=(reg_c)$";
+
+        disasm_combo: (arg) -> std::string = {
+            if arg < 4UL {
+                return "(arg)$";
+            }
+            else if arg == 4UL {
+                return "[A]";
+            }
+            else if arg == 5UL {
+                return "[B]";
+            }
+            else if arg == 6UL {
+                return "[C]";
+            }
+            else {
+                return "[illegal]";
+            }
+        }
+
+        disasm: (this, pc: size_t) -> std::string = {
+            if pc >= imem.size() {
+                return "HALT";
+            }
+            op := imem[pc];
+            arg := imem[pc+1];
+            if op == opcode::adv.get_raw_value() {
+                return "ADV (disasm_combo(arg))$";
+            }
+            else if op == opcode::bxl.get_raw_value() {
+                return "BXL (arg)$";
+            }
+            else if op == opcode::bst.get_raw_value() {
+                return "BST (disasm_combo(arg))$";
+            }
+            else if op == opcode::jnz.get_raw_value() {
+                return "JNZ (arg)$";
+            }
+            else if op == opcode::bxc.get_raw_value() {
+                return "BXC";
+            }
+            else if op == opcode::out.get_raw_value() {
+                return "OUT (disasm_combo(arg))$";
+            }
+            else if op == opcode::bdv.get_raw_value() {
+                return "BDV (disasm_combo(arg))$";
+            }
+            else if op == opcode::cdv.get_raw_value() {
+                return "CDV (disasm_combo(arg))$";
+            }
+            else {
+                return "ILLEGAL";
+            }
+        }
+
+        print_code: (this) = {
+            for 0..<imem.size()/2 do (loc) {
+                std::cout << "(loc*2)$:  (imem[loc*2])$,(imem[loc*2+1])$  (disasm(loc*2))$" << std::endl;
+            }
+        }
+
+        combo: (this, arg: size_t) -> size_t = {
+            if arg < 4UL {
+                return arg;
+            }
+            else if arg == 4UL {
+                return reg_a;
+            }
+            else if arg == 5UL {
+                return reg_b;
+            }
+            else if arg == 6UL {
+                return reg_c;
+            }
+            else {
+                assert(false);
+                return 0UL;
+            }
+        }
+
+        execute: (inout this) = {
+            if (ip >= imem.size()) {
+                is_halted = true;
+                return;
+            }
+            op := imem[ip];
+            arg := imem[ip+1];
+            ip += 2;
+            if op == opcode::adv.get_raw_value() {
+                arg = combo(arg);
+                reg_a >>= arg;
+            }
+            else if op == opcode::bxl.get_raw_value() {
+                reg_b ^= arg;
+            }
+            else if op == opcode::bst.get_raw_value() {
+                arg = combo(arg);
+                reg_b = arg & 7;
+            }
+            else if op == opcode::jnz.get_raw_value() {
+                if reg_a != 0 {
+                    ip = arg;
+                }
+            }
+            else if op == opcode::bxc.get_raw_value() {
+                reg_b = reg_b ^ reg_c;
+            }
+            else if op == opcode::out.get_raw_value() {
+                arg = combo(arg);
+                output.push_back(arg & 7);
+            }
+            else if op == opcode::bdv.get_raw_value() {
+                arg = combo(arg);
+                reg_b = reg_a >> arg;
+            }
+            else if op == opcode::cdv.get_raw_value() {
+                arg = combo(arg);
+                reg_c = reg_a >> arg;
+            }
+            else {
+                assert(false);
+            }
+        }
+    }
+
     export day : type = {
         this: Advent2024::day;
 
@@ -9,9 +159,49 @@ Day17: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            
+            total : i64 = 0;
+
+            cpu := processor();
+            if !bp::parse(m_lines[0], bp::lit("Register A: ") >> bp::ulong_, cpu.reg_a) {
+                std::cerr << "Parsing failure 1 on *(m_lines[0])$*!" << std::endl;
+                exit(1);
+            }
+            if !bp::parse(m_lines[1], bp::lit("Register B: ") >> bp::ulong_, cpu.reg_b) {
+                std::cerr << "Parsing failure 2 on *(m_lines[1])$*!" << std::endl;
+                exit(1);
+            }
+            if !bp::parse(m_lines[2], bp::lit("Register C: ") >> bp::ulong_, cpu.reg_c) {
+                std::cerr << "Parsing failure 3 on *(m_lines[2])$*!" << std::endl;
+                exit(1);
+            }
+            if !bp::parse(m_lines[4], bp::lit("Program: ") >> bp::ulong_ % ',', cpu.imem) {
+                std::cerr << "Parsing failure 4 on *(m_lines[4])$*!" << std::endl;
+                exit(1);
+            }
+
+            if m_verbose {
+                cpu.print_code();
+                std::cout << std::endl;
+            }
+
+            while !cpu.is_halted {
+                if m_verbose {
+                    std::cout << "(cpu)$" << std::endl;
+                }
+                cpu.execute();
+            }
+            
+            std::cout << "(cpu.output)$" << std::endl;
+
+            return total;
         }
     }
+}
+
+
+cpp2: namespace = {
+    to_string: (cpu_: Day17::processor) -> std::string = cpu_.to_string();
 }
