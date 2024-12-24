@@ -1,7 +1,11 @@
 export module Day18;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day18: namespace = {
+
     export day : type = {
         this: Advent2024::day;
 
@@ -9,9 +13,145 @@ Day18: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        coords: @struct @ordered type = {
+            x: int;
+            y: int;
+        }
+
+        path: @struct type = {
+            position: coords;
+            visited: std::shared_ptr<std::vector<coords>>;
+        }
+
+        grid_t: type == std::vector<std::vector<char>>;
+
+        m_grid: grid_t = ();
+        m_blocks: std::vector<coords> = ();
+        m_moves: std::unordered_map<int64_t, int> = ();
+        m_scores: std::map<int, std::vector<coords>> = ();
+
+        make_hash: (position: coords) -> int64_t = (position.x) | (position.y << 12);
+        unmake_hash: (hash: int64_t) -> coords = coords(unchecked_narrow<int>(hash & 0xFFF), unchecked_narrow<int>((hash >> 12) & 0xFFF));
+
+        print_grid: (this) = {
+            for m_grid do (line) {
+                for line do (entry) {
+                    std::cout << entry;
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+
+        find_best_move: (inout this, position: coords, target: coords) -> std::optional<int> = {
+            m_scores = ();
+            m_scores[0] = (position);
+            m_moves = ();
+            winning_paths: std::vector<path> = ();
+            winning_score: std::optional<int> = std::nullopt;
+            outer: while m_scores.size() > 0UL {
+                iter := m_scores.begin();
+                score := iter*.first;
+                posns := iter*.second;
+                _ = m_scores.erase(score);
+                for posns do (pos) {
+                    if m_verbose {
+                        std::cout << "Score (score)$: at ((pos.x)$, (pos.y)$), target is  ((target.x)$, (target.y)$)" << std::endl;
+                    }
+                    if pos.x == target.x && pos.y == target.y {
+                        // We're done!
+                        winning_score = score;
+                        break outer;
+                    }
+                    partial_hash := make_hash(pos);
+                    if !m_moves.count(partial_hash) {
+                        // We haven't been here before. Explore the whole thing.
+                        m_moves[partial_hash] = score;
+                        if m_verbose {
+                            std::cout << "Not seen, fully exploring..." << std::endl;
+                        }
+                        explore(coords(pos.x + 1, pos.y), score+1);
+                        explore(coords(pos.x - 1, pos.y), score+1);
+                        explore(coords(pos.x, pos.y - 1), score+1);
+                        explore(coords(pos.x, pos.y + 1), score+1);
+                    }
+                }
+            }
+            // OK. We have a winning score.
+            return winning_score;
+        }
+
+        explore: (inout this, position: coords, score: int) = {
+            if m_grid[position.y][position.x] != '#' {
+                m_scores[score].push_back(position);
+                if m_verbose {
+                    std::cout << "Exploring to ((position.x)$, (position.y)$) with score (score)$" << std::endl;
+                }
+            }
+        }
+
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            
+            total : i64 = 0;
+
+            // First set up the grid.
+            gridmax := 71;
+            if m_argint != 0 {
+                gridmax = m_argint;
+            }
+            gridtop := std::vector(gridmax+2, '#');
+            m_grid.push_back(gridtop);
+            gridmid := std::vector(gridmax, '.');
+            _ = gridmid.insert(gridmid.begin(), '#');
+            gridmid.push_back('#');
+            for 0..<gridmax do (_) {
+                m_grid.push_back(std::vector(gridmid.begin(), gridmid.end()));
+            }
+            m_grid.push_back(std::vector(gridtop.begin(), gridtop.end()));
+
+            for m_lines do (line) {
+                numberlist_p : std::optional<std::vector<int>> = bp::parse(line, bp::int_ % ',');
+                assert(numberlist_p.has_value() && numberlist_p*.size() == 2);
+                m_blocks.push_back(coords(numberlist_p*[0], numberlist_p*[1]));
+            }
+
+            if m_part_two {
+                // For part 2, we need to keep the blocks falling and see when it blocks the path...
+                for m_blocks do (block) {
+                    assert(m_grid[block.y+1][block.x+1] == '.');
+                    m_grid[block.y+1][block.x+1] = '#';
+                    std::cerr << "#";
+                    answer := find_best_move(coords(1,1), coords(gridmax, gridmax));
+                    if !answer.has_value() {
+                        // Found it!
+                        total = block.x * 1000 + block.y;
+                        std::cerr << std::endl;
+                        std::cout << std::endl << "((block.x)$, (block.y)$)" << std::endl;
+                        break;
+                    }
+                }
+            }
+            else {
+                // For part 1, we need to throw the first 1024 blocks down and _then_
+                // try to find the shortest escape route.
+                for 0..<1024 do (blockid) {
+                    if blockid >= m_blocks.ssize() {
+                        break;
+                    }
+                    block := m_blocks[blockid];
+                    assert(m_grid[block.y+1][block.x+1] == '.');
+                    m_grid[block.y+1][block.x+1] = '#';
+                }
+                if m_verbose {
+                    print_grid();
+                }
+
+                total = find_best_move(coords(1,1), coords(gridmax, gridmax))*;
+
+            }
+
+            return total;
         }
     }
 }
