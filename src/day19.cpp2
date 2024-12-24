@@ -1,7 +1,11 @@
 export module Day19;
 import Advent2024;
+import parser;
+
+bp: namespace == boost::parser;
 
 Day19: namespace = {
+
     export day : type = {
         this: Advent2024::day;
 
@@ -9,9 +13,109 @@ Day19: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        m_towels: std::unordered_map<char, std::unordered_map<char, std::vector<std::string>>> = ();
+
+
+        can_find_combo: (this, line: std::string, offset: int, ignore_full_match: bool) -> bool = {
+            if offset == line.size() {
+                // We're done!
+                return true;
+            }
+            if !m_towels.count(line[offset]) {
+                return false;
+            }
+            first_letter := m_towels.at(line[offset]);
+            if first_letter.count(' ') {
+                // There's a matching single-lettered towel here. Try that.
+                if (can_find_combo(line, offset + 1, false)) {
+                    return true;
+                }
+            }
+            if offset + 1 == line.size() {
+                // We've run off the end.
+                return false;
+            }
+            if !first_letter.count(line[offset+1]) {
+                return false;
+            }
+            if m_verbose {
+                std::cout << std::string(offset, ' ') << "Looking at (m_towels.at(line[offset]).size())$ towels at offset (offset)$..." << std::endl;
+            }
+            for first_letter.at(line[offset+1]) do (towel) {
+                if offset == 0 && ignore_full_match && towel.size() == line.size() {
+                    // Ignore this one so we can erase it if need be.
+                    continue;
+                }
+                if towel.size() + offset <= line.size() {
+                    // Let's see if the towel matches.
+                    if line.compare(offset, towel.size(), towel) == 0 {
+                        // Good so far...
+                        if (can_find_combo(line, offset + towel.size(), false)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            
+            total : i64 = 0;
+
+            seen_towels := false;
+            seen_blank := false;
+            lines_seen := 0;
+            for m_lines do (line) {
+                if (!seen_towels) {
+                    towels_p: std::optional<std::vector<std::string>> = bp::parse(line, +bp::lower % ',', bp::ws);
+                    assert(towels_p.has_value());
+                    for towels_p* do (towel) {
+                        if towel.size() == 1 {
+                            m_towels[towel[0]][' '].push_back(towel);
+                        }
+                        else {
+                            m_towels[towel[0]][towel[1]].push_back(towel);
+                        }
+                    }
+                    // OK. Now let's see if any towels are redundant.
+                    for m_towels do (inout first_letter) {
+                        for first_letter.second do (inout towelset) {
+                            did_something := true;
+                            while did_something {
+                                did_something = false;
+                                for 0..<towelset.second.size() do (offset) {
+                                    towel := towelset.second[offset];
+                                    if can_find_combo(towel, 0, true) {
+                                        std::cout << "Erasing (towel)$ because it can be made up of others" << std::endl;
+                                        _ = towelset.second.erase(towelset.second.begin() + offset);
+                                        did_something = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        } 
+                    }
+                    
+
+
+                    seen_towels = true;
+                }
+                else if (!seen_blank) {
+                    seen_blank = true;
+                }
+                else {
+                    if can_find_combo(line, 0, false) {
+                        total++;
+                    }
+                    lines_seen++;
+                    //if lines_seen % 10 == 0 {
+                        std::cout << "Seen (lines_seen)$ towel combos..." << std::endl;
+                    //}
+                }
+            }
+
+            return total;
         }
     }
 }

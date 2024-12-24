@@ -13,4 +13,6 @@ namespace boost::parser {
     export using boost::parser::lit;
     export using boost::parser::string;
     export using boost::parser::tuple;
+    export using boost::parser::upper;
+    export using boost::parser::lower;
 }
