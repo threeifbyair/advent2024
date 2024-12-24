@@ -21,7 +21,7 @@ main : (args) -> int = {
    verbose : bool = false;
    part_two : bool = false;
    day : int = 0;
-   argint : int = 0;
+   argint : i64 = 0;
 
    desc.add_options()
        ("help,h", "produce help message")
@@ -29,7 +29,7 @@ main : (args) -> int = {
        ("part-two,p", po::bool_switch(part_two&), "Perform part two of the challemge")
        ("verbose,v", po::bool_switch(verbose&), "Print verbose output")
        ("day,d", po::value<int>(day&), "Which day to run")
-       ("argint,a", po::value<int>(argint&), "An extra argument")
+       ("argint,a", po::value<i64>(argint&), "An extra argument")
    ;
 
    vm := po::variables_map();

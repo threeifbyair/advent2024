@@ -40,7 +40,7 @@ Advent2024: namespace = {
         protected m_lines: std::vector<std::string>;
         protected m_part_two : bool;
         protected m_verbose : bool;
-        protected m_argint : int;
+        protected m_argint : i64;
         operator= : (out this, lines, part_two, verbose, argint) = {
             m_lines = lines;
             m_part_two = part_two;
@@ -51,5 +51,5 @@ Advent2024: namespace = {
         operator=: (virtual move this) = {}
     }
 
-    export today_fn : type == (lines: std::vector<std::string>, part_two: bool, verbose: bool, argint: int) -> std::unique_ptr<day>;
+    export today_fn : type == (lines: std::vector<std::string>, part_two: bool, verbose: bool, argint: i64) -> std::unique_ptr<day>;
 }

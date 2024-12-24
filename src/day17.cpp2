@@ -27,7 +27,7 @@ Day17: namespace = {
         public is_halted: bool = false;
         public output: std::vector<size_t> = ();
 
-        to_string: (this) -> std::string = "IP: (ip)$  (disasm(ip))$  A=(reg_a)$ B=(reg_b)$ C=(reg_c)$";
+        to_string: (this) -> std::string = "IP: (ip)$  (disasm(ip))$  A=(reg_a)$ B=(reg_b)$ C=(reg_c)$  OUT=(output)$";
 
         disasm_combo: (arg) -> std::string = {
             if arg < 4UL {
@@ -159,6 +159,206 @@ Day17: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        check_self_replicate: (this, a_value: i64, imem: std::vector<size_t>) -> bool = attempt_self_replicate(a_value, imem) == imem.size();
+
+        attempt_self_replicate: (this, a_value: i64, imem: std::vector<size_t>) -> size_t = {
+            if m_verbose {
+                std::cout << std::endl << "Trying A=(a_value)$..." << std::endl;
+            }
+            cpu := processor();
+            cpu.ip = 0;
+            cpu.reg_a = a_value;
+            cpu.reg_b = 0;
+            cpu.reg_c = 0;
+            out_size := 0;
+            cpu.imem = std::vector<size_t>(imem.begin(), imem.end());
+            cpu.output = ();
+            cpu.is_halted = false;
+            while !cpu.is_halted {
+                if m_verbose {
+                    std::cout << "(cpu)$" << std::endl;
+                }
+                cpu.execute();
+                if cpu.output.size() != out_size {
+                    out_size++;
+                    if cpu.output.size() > cpu.imem.size() {
+                        // We output too much.
+                        break;
+                    }
+                    if cpu.output[out_size-1] != cpu.imem[out_size-1] {
+                        // We output the wrong thing.
+                        break;
+                    }
+                }
+            }
+            if cpu.output.size() > cpu.imem.size() {
+                return 0;
+            }
+            else if cpu.output.size() > 0U && cpu.output[out_size-1] != cpu.imem[out_size-1] {
+                return cpu.output.size() - 1;
+            }
+            else {
+                return cpu.output.size();
+            }
+        }
+
+        compute_self_replication_value: (inout this) -> i64 = {
+            // This is ONLY valid for the program I got, which is:
+            // 2,4,1,5,7,5,1,6,4,2,5,5,0,3,3,0
+            // This translates to:
+            // 1. B = A & 7
+            // 2. B ^= 5
+            // 3. C = A >> B
+            // 4. B ^= 6
+            // 5. B ^= C
+            // 6. OUT B
+            // 7. A >>= 3
+            // 8. Repeat if A != 0
+
+            // This means that we're going to backsolve this for each output value
+            // and see what values of A will cause this
+            // We take the values of A three bits at a time, but higher bits will come into play too.
+
+            // At each point, there are eight possible answers -- one for each value of A & 7. Some of them will later conflict and be dropped because those higher bits aren't possible. So we'll recurse.
+            // B2 = A & 7
+            // B3 = B2 ^ 5
+            // C4 = A >> B3
+            // B5 = B3 ^ 6
+            // B6 = B5 ^ C4
+            // B6 = target
+
+            // Let's try going forward with the eight values of A.
+            // B2X = AX & 7
+            // B3X = B2X ^ 5
+            // C4X = AY >> B3X (choosing eight values for AY as well)
+            // B5X = B3X ^ 6
+            // B6X = B5X ^ C4X
+            // Now we ask two questions? Is B6X == target? Do the masks and values of AX and AY match?
+
+
+
+
+            program: std::vector<size_t> = (2,4,1,5,7,5,1,6,4,2,5,5,0,3,3,0);
+
+            return lowest_match(0UL, 0UL, program, 0, 0)*;
+
+        }
+
+        m_seen: std::unordered_set<i64> = ();
+
+        lowest_match: (inout this, value: i64, mask: i64, program: std::vector<size_t>, offset: size_t, depth: int) -> std::optional<i64> = {
+            if offset == program.size() {
+                // We're done!
+                if m_verbose {
+                    std::cout << std::string(depth, ' ') << "GOT ONE! value=0o(value:o)$=(value)$" << std::endl;
+                }
+                return value;
+            }
+            if m_verbose {
+                std::cout << std::string(depth, ' ') << "Entering lowest match, value=0o(value:o)$, mask=0o(mask:o)$, offset=(offset)$, target=(program[offset])$" << std::endl;
+            }
+            // So this time we try values 0-1023 and see which ones get us further. Anything that collects output up to 1023 is worth exploring.
+            best: std::optional<i64> = std::nullopt;
+            for 1..<1024 do (attempt:u64) {
+                seed: u64 = (attempt << (offset * 3)) | value;
+                if m_seen.count(seed) {
+                    continue;
+                }
+                match: u64 = attempt_self_replicate(seed, program);
+                if match > offset {
+                    if m_verbose {
+                        std::cout << std::string(depth+1, ' ') << "Recursing with value (seed:o)$" << std::endl;
+                    }
+                    recurse := lowest_match(seed, 0, program, offset + 1, depth + 3);
+                    if recurse && (!best || recurse* < best*) {
+                        best = recurse;
+                    }
+                }        
+                _ = m_seen.insert(seed);
+            }
+            return best;
+        }
+
+
+
+        lowest_match_old: (this, value: i64, mask: i64, program: std::vector<size_t>, offset: size_t, depth: int) -> std::optional<i64> = {
+            if offset == program.size() {
+                // We're done!
+                if m_verbose {
+                    std::cout << std::string(depth, ' ') << "GOT ONE! value=0o(value:o)$=(value)$" << std::endl;
+                }
+                return value;
+            }
+            if m_verbose {
+                std::cout << std::string(depth, ' ') << "Entering lowest match, value=0o(value:o)$, mask=0o(mask:o)$, offset=(offset)$, target=(program[offset])$" << std::endl;
+            }
+
+            target: size_t = program[offset];
+            best: std::optional<i64> = std::nullopt;
+
+            for 0..<8 do (ax: i64) {
+                if m_verbose {
+                    std::cout << std::string(depth, ' ') << "Running with ax=(ax)$..." << std::endl;
+                }
+                for 0..< 8 do (c4x: i64) {
+                    b3x :i64 = ax ^ 5;
+                    ay :i64 = c4x << b3x;
+                    upper :i64 = c4x << b3x;
+                    lower :i64 = b3x ^ 6;
+                    if m_verbose {
+                        std::cout << std::string(depth+1, ' ') << "Running with c4x=(c4x)$ giving upper (upper:o)$, lower (lower:o)$, shift (b3x)$..." << std::endl;
+                    }
+                    if ((upper ^ lower ^ c4x) & 7) != target {
+                        if m_verbose {
+                            std::cout << std::string(depth+1, ' ') << "Answer ((upper ^ lower) & 7)$ does not match target (target)$" << std::endl;
+                        }
+                        continue;
+                    }
+                    lowervalue :i64 = ax << (offset * 3);
+                    uppervalue :i64 = ay << (offset * 3);
+                    lowermask :i64 = 7 << (offset * 3);
+                    uppermask :i64 = 7 << (offset * 3 + b3x);
+                    if m_verbose {
+                        std::cout << std::string(depth+1, ' ') << "upper=(uppervalue:o)$ mask (uppermask:o)$, lower=(lowervalue:o)$ mask (lowermask:o)$" << std::endl;
+                    }
+                    //if lowermask & uppermask {
+                    //    // We need to check that our values don't overlap.
+                    //    if (lowervalue & (lowermask & uppermask)) != (uppervalue & //(lowermask & uppermask)) {
+                    //        // Can't do this!
+                    //        if m_verbose {
+                    //            std::cout << std::string(depth+1, ' ') << "Not compatible, masks overlap" << std::endl;
+                    //        }
+                    //        continue;
+                    //    }
+                    //}
+                    // Now, do we conflict with any existing masks?
+                    fullvalue := lowervalue | uppervalue;
+                    fullmask := lowermask | uppermask;
+
+                    if (value & (mask & fullmask)) != (fullvalue & (mask & fullmask)) {
+                        // Conflict!
+                        if m_verbose {
+                            std::cout << std::string(depth+1, ' ') << "Not compatible, existing value 0o(value:o)$ mask 0o(mask:o)$ cannot cope with new value 0o(fullvalue:o)$ mask 0o(fullmask:o)$ : AND of mask is 0o(mask & fullmask:o)$, existing masked 0o(value & (mask & fullmask):o)$, new 0o(fullvalue & (mask & fullmask):o)$" << std::endl;
+                        }
+                        continue;
+                    }
+                    // This is one we should try.
+                    fullvalue |= value;
+                    fullmask |= mask;
+
+                    if m_verbose {
+                        std::cout << std::string(depth+1, ' ') << "Recursing with value (fullvalue:o)$ and mask (fullmask:o)$" << std::endl;
+                    }
+
+                    recurse := lowest_match_old(fullvalue, fullmask, program, offset + 1, depth + 3);
+                    if recurse && (!best || recurse* < best*) {
+                        best = recurse;
+                    }
+                }
+
+            }
+            return best;
+        }
 
         run : (override inout this) -> i64 = {
             
@@ -187,15 +387,32 @@ Day17: namespace = {
                 std::cout << std::endl;
             }
 
-            while !cpu.is_halted {
-                if m_verbose {
-                    std::cout << "(cpu)$" << std::endl;
+            if m_part_two {
+                a_value: size_t = unchecked_narrow<size_t>(m_argint);
+                if a_value == 0 {
+                    a_value = compute_self_replication_value();
                 }
-                cpu.execute();
+                if check_self_replicate(a_value, cpu.imem) {
+                    total = a_value;
+                }
+                else
+                {
+                    total = 0;
+                }
+                //for 0..<a_value do (attempt) {
+                //    _ = check_self_replicate(attempt, cpu.imem);
+                //}
             }
-            
-            std::cout << "(cpu.output)$" << std::endl;
-
+            else {
+                while !cpu.is_halted {
+                    if m_verbose {
+                        std::cout << "(cpu)$" << std::endl;
+                    }
+                    cpu.execute();
+                }
+                
+                std::cout << "(cpu.output)$" << std::endl;
+            }
             return total;
         }
     }
