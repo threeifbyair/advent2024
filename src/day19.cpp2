@@ -14,7 +14,83 @@ Day19: namespace = {
         }
 
         m_towels: std::unordered_map<char, std::unordered_map<char, std::vector<std::string>>> = ();
+        m_combos_cache: std::unordered_map<std::string, i64> = ();
 
+        find_num_combos: (inout this, line: std::string, offset: int, level: int) -> i64 = {
+            // Count the number of ways to make this towel combo.
+            if m_verbose {
+                std::cout << std::string(level * 2, ' ') << "Finding combos for '(line.substr(offset))$'..." << std::endl;
+            }
+            if m_combos_cache.count(line.substr(offset)) {
+                if m_verbose {
+                    std::cout << std::string(level * 2, ' ') << "Cache hit for '(line.substr(offset))$' = (m_combos_cache.at(line.substr(offset)))$" << std::endl;
+                }
+                return m_combos_cache.at(line.substr(offset));
+            }
+            count: i64 = 0;
+            if offset == line.size() {
+
+                return 0;
+            }
+            if !m_towels.count(line[offset]) {
+                if m_verbose {
+                    std::cout << std::string(level * 2, ' ') << "No towels start with '(line[offset])$' at offset (offset)$" << std::endl;
+                }
+                m_combos_cache[line.substr(offset)] = 0;
+                return 0;
+            }
+            first_letter := m_towels.at(line[offset]);
+            if first_letter.count(' ') {
+                // There's a matching single-lettered towel here. Try that.
+                if offset + 1 == line.size() {
+                    if m_verbose {
+                        std::cout << std::string(level * 2, ' ') << "Found complete match with single-letter towel '(line[offset])$' at offset (offset)$" << std::endl;
+                    }
+                    count += 1;
+                }
+                else {
+                    if m_verbose {
+                        std::cout << std::string(level * 2, ' ') << "Found partial match with single-letter towel '(line[offset])$' at offset (offset)$" << std::endl;
+                    }
+                    count += find_num_combos(line, offset + 1, level + 1);
+                }
+            }
+            if offset + 1 == line.size() || !first_letter.count(line[offset+1]) {
+                if m_verbose {
+                    std::cout << std::string(level * 2, ' ') << "No multi-letter towels match at offset (offset)$" << std::endl;
+                }
+                m_combos_cache[line.substr(offset)] = count;
+                //_ = m_combos_cache.insert(std::make_pair(line.substr(offset), count));
+                return count;
+            }
+            // There are multi-letter towels that might match.
+            second_letter := first_letter.at(line[offset+1]);
+            for second_letter do (towel) {
+                if towel.size() + offset <= line.size() {
+                    // Let's see if the towel matches.
+                    if line.compare(offset, towel.size(), towel) == 0 {
+                        // Good so far...
+                        if offset + towel.size() == line.size() {
+                            if m_verbose {
+                                std::cout << std::string(level * 2, ' ') << "Found complete match with towel '(towel)$' at offset (offset)$" << std::endl;
+                            }
+                            count += 1;
+                        }
+                        else {
+                            if m_verbose {
+                                std::cout << std::string(level * 2, ' ') << "Found partial match with towel '(towel)$' at offset (offset)$" << std::endl;
+                            }
+                            count += find_num_combos(line, offset + towel.size(), level + 1);
+                        }
+                    }
+                }
+            }
+            if m_verbose {
+                std::cout << std::string(level * 2, ' ') << "Found (count)$ combos for '(line.substr(offset))$'" << std::endl;
+            }
+            m_combos_cache[line.substr(offset)] = count;
+            return count;
+        }
 
         can_find_combo: (this, line: std::string, offset: int, ignore_full_match: bool) -> bool = {
             if offset == line.size() {
@@ -79,25 +155,25 @@ Day19: namespace = {
                         }
                     }
                     // OK. Now let's see if any towels are redundant.
-                    for m_towels do (inout first_letter) {
-                        for first_letter.second do (inout towelset) {
-                            did_something := true;
-                            while did_something {
-                                did_something = false;
-                                for 0..<towelset.second.size() do (offset) {
-                                    towel := towelset.second[offset];
-                                    if can_find_combo(towel, 0, true) {
-                                        std::cout << "Erasing (towel)$ because it can be made up of others" << std::endl;
-                                        _ = towelset.second.erase(towelset.second.begin() + offset);
-                                        did_something = true;
-                                        break;
+                    if !m_part_two {
+                        for m_towels do (inout first_letter) {
+                            for first_letter.second do (inout towelset) {
+                                did_something := true;
+                                while did_something {
+                                    did_something = false;
+                                    for 0..<towelset.second.size() do (offset) {
+                                        towel := towelset.second[offset];
+                                        if can_find_combo(towel, 0, true) {
+                                            std::cout << "Erasing (towel)$ because it can be made up of others" << std::endl;
+                                            _ = towelset.second.erase(towelset.second.begin() + offset);
+                                            did_something = true;
+                                            break;
+                                        }
                                     }
                                 }
-                            }
-                        } 
-                    }
-                    
-
+                            } 
+                        }
+                    }                       
 
                     seen_towels = true;
                 }
@@ -105,13 +181,23 @@ Day19: namespace = {
                     seen_blank = true;
                 }
                 else {
-                    if can_find_combo(line, 0, false) {
-                        total++;
+                    if m_part_two {
+                        combos := find_num_combos(line, 0, 0);
+                        total += combos;
+                        lines_seen++;
+                        if m_verbose {
+                            std::cout << "Seen (lines_seen)$ towel combos, total now (total)$..." << std::endl;
+                        }
                     }
-                    lines_seen++;
-                    //if lines_seen % 10 == 0 {
-                        std::cout << "Seen (lines_seen)$ towel combos..." << std::endl;
-                    //}
+                    else {
+                        if can_find_combo(line, 0, false) {
+                            total++;
+                        }
+                        lines_seen++;
+                        //if lines_seen % 10 == 0 {
+                            std::cout << "Seen (lines_seen)$ towel combos..." << std::endl;
+                        //}
+                    }
                 }
             }
 

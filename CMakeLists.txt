@@ -2,8 +2,8 @@
 cmake_minimum_required(VERSION 3.30.0 FATAL_ERROR)
 
 # Set the C and C++ compilers to Clang
-set(CMAKE_C_COMPILER /usr/lib/llvm-19/bin/clang)
-set(CMAKE_CXX_COMPILER /usr/lib/llvm-19/bin/clang++)
+set(CMAKE_C_COMPILER /home/abell/.local/bin/clang)
+set(CMAKE_CXX_COMPILER /home/abell/.local/bin/clang++)
 set(CMAKE_CXX_STANDARD_LIBRARY libc++)
 
 # Enables the Standard module support. This needs to be done
@@ -59,8 +59,8 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
-#cmake_policy(SET CMP0167 NEW)
-set(Boost_DIR /home/abell/.local/lib/cmake/Boost-1.83.0)
+cmake_policy(SET CMP0167 NEW)
+set(Boost_DIR /home/abell/.local/lib/cmake/Boost-1.89.0)
 
 # Define the project name and version
 project(advent2024 VERSION 1.0 LANGUAGES "CXX")
