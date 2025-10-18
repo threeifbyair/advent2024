@@ -9,9 +9,157 @@ Day20: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        coords: @struct @ordered type = {
+            x: i32;
+            y: i32;
+        }
+
+        grid_t: type == std::vector<std::vector<char>>;
+
+        m_grid: grid_t = ();
+        m_start: coords = coords(0,0);
+        m_end: coords = coords(0,0);
+        m_picos_to_start: std::unordered_map<u64, i32> = ();
+        m_picos_to_end: std::unordered_map<u64, i32> = ();
+
+        make_hash: (position: coords) -> u64 = (position.x) | (position.y << 12);
+        unmake_hash: (hash: u64) -> coords = {
+            result := coords(0,0);
+            result.x = hash & 0xFFF;
+            result.y = (hash >> 12) & 0xFFF;
+            return result;
+        }
+
+        populate_move_cache: (inout this, position: coords, inout cache: std::unordered_map<u64, i32>, level: i32) = {
+            if m_verbose {
+                std::cout << std::string(level * 2, ' ') << "Finding best move from ((position.x)$, (position.y)$)..." << std::endl;
+            }
+            if cache.count(make_hash(position)) {
+                if m_verbose {
+                    std::cout << std::string(level * 2, ' ') << "Cache hit for ((position.x)$, (position.y)$) = (cache.at(make_hash(position)))$" << std::endl;
+                }
+                return;
+            }
+            cache[make_hash(position)] = level;
+
+            // Try moving in each direction.
+            directions : std::vector<coords> = (coords(1,0), coords(-1,0), coords(0,1), coords(0,-1));
+            for directions do (dir) {
+                new_pos := coords(position.x + dir.x, position.y + dir.y);
+                if new_pos.x >= 0 && new_pos.x < m_grid[0].ssize() && new_pos.y >= 0 && new_pos.y < m_grid.ssize() {
+                    if m_grid[new_pos.y][new_pos.x] != '#' {
+                        if m_verbose {
+                            std::cout << std::string(level * 2, ' ') << "Moving to ((new_pos.x)$, (new_pos.y)$)..." << std::endl;
+                        }
+                        populate_move_cache(new_pos, cache, level + 1);
+                    }
+                    else {
+                        if m_verbose {
+                            std::cout << std::string(level * 2, ' ') << "Position ((new_pos.x)$, (new_pos.y)$) is a wall, skipping." << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+
+        find_paths: (inout this) -> i32 = {
+            // Find the best path from start to everywhere and end to everywhere.
+            populate_move_cache(m_start, m_picos_to_start, 0);
+            populate_move_cache(m_end, m_picos_to_end, 0);
+            return m_picos_to_start.at(make_hash(m_end));
+        }
+
+        print_grid: (this) = {
+            for m_grid do (line) {
+                for line do (entry) {
+                    std::cout << entry;
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total : i64 = 0;
+
+            for m_lines do (line) {
+                _ = m_grid.push_back(std::vector(line.begin(), line.end()));
+            }
+
+            if m_verbose {
+                std::cout << "Initial grid:" << std::endl;
+                print_grid();
+            }
+
+            // OK. Let's get started. First find the start.
+            for 0..<m_grid.size() do (y: i32) {
+                for 0..<m_grid[y].size() do (x: i32) {
+                    if m_grid[y][x] == 'S' {
+                        m_start = coords(x,y);
+                        //m_grid[y][x] = '.';
+                    }
+                    else if m_grid[y][x] == 'E' {
+                        m_end = coords(x,y);
+                        //m_grid[y][x] = '.';
+                    }
+                }
+            }
+
+            total_picos := find_paths();
+            if m_verbose {
+                std::cout << "Picos to start:" << std::endl;
+                for m_picos_to_start do (entry) {
+                    pos := unmake_hash(entry.first);
+                    std::cout << "  ((pos.x)$, (pos.y)$) : (entry.second)$" << std::endl;
+                }
+                std::cout << "Picos to end:" << std::endl;
+                for m_picos_to_end do (entry) {
+                    pos := unmake_hash(entry.first);
+                    std::cout << "  ((pos.x)$, (pos.y)$) : (entry.second)$" << std::endl;
+                }
+            }
+
+            // Now go through each position and see if we can find one up to three away with a lower total.
+            for 0..<m_grid.size() do (y: i32) {
+                for 0..<m_grid[y].size() do (x: i32) {
+                    if m_grid[y][x] != '#' {
+                        pos := coords(x,y);
+                        total_here := m_picos_to_start.at(make_hash(pos)) + m_picos_to_end.at(make_hash(pos));
+                        if m_verbose {
+                            std::cout << "At ((x)$, (y)$) total picos is (total_here)$ = (m_picos_to_start.at(make_hash(pos)))$ + (m_picos_to_end.at(make_hash(pos)))$" << std::endl;
+                        }
+                        // See if we can do better by going to a nearby position.
+                        for (-2)..=2 do (dy: i32) {
+                            for (-2)..=2 do (dx: i32) {
+                                if (dx == 0 && dy == 0) || (abs(dx) + abs(dy) > 2) {
+                                    continue;
+                                }
+                                new_x := x + dx;
+                                new_y := y + dy;
+                                if new_x >= 0 && new_x < m_grid[0].ssize() && new_y >= 0 && new_y < m_grid.ssize() {
+                                    if m_grid[new_y][new_x] != '#' {
+                                        new_pos := coords(new_x, new_y);
+                                        total_new := m_picos_to_start.at(make_hash(pos)) + m_picos_to_end.at(make_hash(new_pos)) + abs(dx) + abs(dy);
+                                        if total_new < total_picos {
+                                            if m_verbose {
+                                                std::cout << "At ((x)$, (y)$) moving to ((new_x)$, (new_y)$) reduces local total from (total_here)$ to (total_new)$" << std::endl;
+                                            }
+                                            if total_picos - total_new >= m_argint {
+                                                total++;
+                                                if m_verbose {
+                                                    std::cout << "Significant improvement found: from (total_picos)$ to (total_new)$ by moving from ((x)$, (y)$) to ((new_x)$, (new_y)$)" << std::endl;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return total;
         }
     }
 }
