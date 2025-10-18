@@ -3,9 +3,37 @@ import program_options;
 
 po : namespace == boost::program_options;
 
-read_file: (inout infd : std::istream) -> std::vector<std::string> = {
+read_file: (inout infd : std::istream, encrypted : bool, copy password : std::string) -> std::vector<std::string> = {
    lines := std::vector<std::string>();
    line : std::string = "";
+   decrypted_data := std::vector<char>();
+   if encrypted {
+      if password == "" {
+         password_cstr := std::getenv("AOC_PASSWORD");
+         if password_cstr {
+            password = std::string(password_cstr);
+         }
+      }
+      if password == "" {
+         std::cerr << "Password must be provided for encrypted input files." << std::endl;
+         return lines;
+      }
+      // Create a simple hash from the password to use as a XOR key.
+      hash := std::hash<std::string>();
+      xor_gen := std::mt19937(hash(password));
+
+      buffer := std::array<char, 4096>();
+      while infd.read(buffer.data(), sizeof(buffer)) || infd.gcount() > 0 {
+         bytes_read : std::streamsize = infd.gcount();
+         for 0..<bytes_read do(i) {
+            decrypted_data.push_back(buffer[i] ^ unchecked_narrow<u8>(xor_gen()));
+         }
+      }
+      infd_string := std::istringstream(std::string(decrypted_data.data(), decrypted_data.size()));
+      retval := read_file(infd_string, false, password);
+      _ = infd_string; // Keep the stringstream alive until the return.
+      return retval;
+   }
    std::getline(infd, line);
    while infd as bool 
    next std::getline(infd, line)  
@@ -22,14 +50,18 @@ main : (args) -> int = {
    part_two : bool = false;
    day : int = 0;
    argint : i64 = 0;
+   encrypted : bool = false;
+   password : std::string = "";
 
    desc.add_options()
        ("help,h", "produce help message")
        ("input,i", po::value<std::string>(infile&)*.default_value("-"), "Input file")
-       ("part-two,p", po::bool_switch(part_two&), "Perform part two of the challemge")
+       ("part-two,p", po::bool_switch(part_two&), "Perform part two of the challenge")
        ("verbose,v", po::bool_switch(verbose&), "Print verbose output")
        ("day,d", po::value<int>(day&), "Which day to run")
        ("argint,a", po::value<i64>(argint&), "An extra argument")
+       ("encrypted,e", po::bool_switch(encrypted&), "Input file is encrypted")
+       ("password,P", po::value<std::string>(password&)*.default_value(""), "Password for encrypted file")
    ;
 
    vm := po::variables_map();
@@ -50,7 +82,7 @@ main : (args) -> int = {
    lines : std::vector<std::string>;
    if (!infd.is_open()) {
       if (infile == "-") {
-         lines = read_file(std::cin);
+         lines = read_file(std::cin, encrypted, password);
       }
       else {
          lines = ();
@@ -59,9 +91,9 @@ main : (args) -> int = {
       }
    }
    else {
-      lines = read_file(infd);
+      lines = read_file(infd, encrypted, password);
+      _ = infd; // Keep the file stream alive until after reading.
    }
-   _ = infd;
 
    runnable := Days::make_day(day, lines, part_two, verbose, argint);
    std::cout << "(runnable*.run())$" << std::endl;

@@ -84,4 +84,9 @@ else()
     message(FATAL_ERROR "Boost not found!")
 endif()
 
+# And a second executable for encrypting files
+add_executable(encrypt_file src/encrypt_file.cpp)
+target_include_directories(encrypt_file PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(encrypt_file PRIVATE Boost::program_options)
+
 
