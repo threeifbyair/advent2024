@@ -82,6 +82,10 @@ Day20: namespace = {
 
         run : (override inout this) -> i64 = {
             total : i64 = 0;
+            cheat_len: i32 = 2;
+            if m_part_two {
+                cheat_len = 20;
+            }
 
             for m_lines do (line) {
                 _ = m_grid.push_back(std::vector(line.begin(), line.end()));
@@ -130,9 +134,9 @@ Day20: namespace = {
                             std::cout << "At ((x)$, (y)$) total picos is (total_here)$ = (m_picos_to_start.at(make_hash(pos)))$ + (m_picos_to_end.at(make_hash(pos)))$" << std::endl;
                         }
                         // See if we can do better by going to a nearby position.
-                        for (-2)..=2 do (dy: i32) {
-                            for (-2)..=2 do (dx: i32) {
-                                if (dx == 0 && dy == 0) || (abs(dx) + abs(dy) > 2) {
+                        for (-cheat_len)..=cheat_len do (dy: i32) {
+                            for (-cheat_len)..=cheat_len do (dx: i32) {
+                                if (dx == 0 && dy == 0) || (abs(dx) + abs(dy) > cheat_len) {
                                     continue;
                                 }
                                 new_x := x + dx;
