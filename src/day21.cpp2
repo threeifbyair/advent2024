@@ -9,9 +9,196 @@ Day21: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        coords: type = {
+            public x: i32;
+            public y: i32;
+
+            hash: (this) -> u64 = {
+                return unchecked_narrow<u64>(x) | (unchecked_narrow<u64>(y) << 32);
+            }
+            operator=: (out this, that) = {
+                this.x = that.x;
+                this.y = that.y;
+            }
+            operator=: (implicit out this) = {
+                this.x = 0;
+                this.y = 0;
+            }
+            operator=: (out this, hash: u64) = {
+                this.x = unchecked_narrow<i32>(hash & 0xFFFFFFFF);
+                this.y = unchecked_narrow<i32>((hash >> 32) & 0xFFFFFFFF);
+            }
+            operator=: (out this, x: i32, y: i32) = {
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        robot: type = {
+            public keys: std::unordered_map<char, coords>;
+            public reverse_keys: std::unordered_map<u64, char>;
+            public position: coords;
+
+            operator=: (out this, keys_in: std::unordered_map<char, coords>) = {
+                keys = keys_in;
+                reverse_keys = std::unordered_map<u64, char>();
+                position = keys['A'];
+                for keys do (kv) {
+                    key := kv.first;
+                    value := kv.second;
+                    reverse_keys[value.hash()] = key;
+                }
+            }
+            operator=: (implicit out this) = {
+                keys = std::unordered_map<char, coords>();
+                reverse_keys = std::unordered_map<u64, char>();
+                position = coords(0,0);
+            }
+            operator=: (out this, that) = {
+                keys = that.keys;
+                reverse_keys = that.reverse_keys;
+                position = that.position;
+            }
+            display: (this) = {
+                for 0..<4 do (y) {
+                    for 0..<3 do (x) {
+                        pos := coords(x,y);
+                        std::cout << " ";
+                        if reverse_keys.count(pos.hash()) {
+                            std::cout << reverse_keys.at(pos.hash());
+                        }
+                        else {
+                            std::cout << '.';
+                        }
+                        if pos.x == position.x && pos.y == position.y {
+                            std::cout << "*";
+                        }
+                        else {
+                            std::cout << " ";
+                        }
+                    }
+                    std::cout << std::endl;
+                }
+            }
+        }
+
+
+        playback_sequence: (this, inout robots: std::vector<robot>, sequence: std::string) -> std::string = {
+            output: std::string = "";
+            for sequence do (base_ch) {
+                ch : char = base_ch;
+                i := 0;
+                if m_verbose {
+                    std::cout << "Top of loop:" << std::endl;
+                    j := 0;
+                    for robots next j++ do (ourrobot) {
+                        std::cout << " Robot (j)$ at position ((ourrobot.position.x)$, (ourrobot.position.y)$):" << std::endl;
+                        ourrobot.display();
+                        std::cout << std::endl;
+                    }
+                }
+                robot_loop: for robots next i++ do (inout ourrobot) {
+                    if m_verbose {
+                        std::cout << "Robot (i)$ at position ((ourrobot.position.x)$, (ourrobot.position.y)$) processing '(ch)$'" << std::endl;
+                    }
+                    if ch == '^' {
+                        ourrobot.position.y -= 1;
+                    }
+                    else if ch == 'v' {
+                        ourrobot.position.y += 1;
+                    }
+                    else if ch == '<' {
+                        ourrobot.position.x -= 1;
+                    }
+                    else if ch == '>' {
+                        ourrobot.position.x += 1;
+                    }
+                    else if ch >= '0' && ch <= '9' {
+                        // Check we're the last robot.
+                        if m_verbose {
+                            std::cout << "Robot (i)$ at position ((ourrobot.position.x)$, (ourrobot.position.y)$) outputting '(ch)$'" << std::endl;
+                        }
+                        assert(i == robots.size() - 1);
+                        output += ch;
+                        std::cout << "ZZZ Got output '(ch)$', current output is '(output)$'" << std::endl;
+                        break robot_loop;
+                    }
+                    if ch == 'A' {
+                        if m_verbose {
+                            std::cout << "Robot (i)$ at position ((ourrobot.position.x)$, (ourrobot.position.y)$) got A, moving to next robot" << std::endl;
+                        }
+                        assert(ourrobot.keys.count(ourrobot.reverse_keys.at(ourrobot.position.hash())));
+                        ch = ourrobot.reverse_keys.at(ourrobot.position.hash());
+                        if i == robots.size() - 1 {
+                            if m_verbose {
+                                std::cout << "Robot (i)$ at position ((ourrobot.position.x)$, (ourrobot.position.y)$) outputting '(ch)$'" << std::endl;
+                            }
+                            output += ch;
+                            break robot_loop;
+                        }
+                        // Continue to the next robot.
+                    }
+                    else {
+                        if m_verbose {
+                            std::cout << "Robot (i)$ at position ((ourrobot.position.x)$, (ourrobot.position.y)$) moved to '(ourrobot.reverse_keys.at(ourrobot.position.hash()))$'" << std::endl;
+                        }
+                        assert(ourrobot.reverse_keys.count(ourrobot.position.hash()));
+                        break robot_loop;  // go to next character
+                    }
+                    if m_verbose {
+                        std::cout << "Robot (i)$ at position ((ourrobot.position.x)$, (ourrobot.position.y)$) continuing with '(ch)$'" << std::endl;
+                    }
+                }
+
+            }
+            return output;
+        }
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total : i64 = 0;
+            // First, let's find the quickest way to do any particular task.
+            // We assume that it's always quicker to turn just once.
+            
+            // Configuration of robots.
+            robot0_config: std::unordered_map<char, coords> = ();
+            robot0_config['A'] = coords(2,3);
+            robot0_config['0'] = coords(1,3);
+            robot0_config['1'] = coords(0,2);
+            robot0_config['2'] = coords(1,2);
+            robot0_config['3'] = coords(2,2);
+            robot0_config['4'] = coords(0,1);
+            robot0_config['5'] = coords(1,1);
+            robot0_config['6'] = coords(2,1);
+            robot0_config['7'] = coords(0,0);
+            robot0_config['8'] = coords(1,0);
+            robot0_config['9'] = coords(2,0);
+
+            robot1_config: std::unordered_map<char, coords> = ();
+            robot1_config['A'] = coords(2,0);
+            robot1_config['^'] = coords(1,0);
+            robot1_config['<'] = coords(0,1);
+            robot1_config['v'] = coords(1,1);
+            robot1_config['>'] = coords(2,1);
+
+            robots := std::vector<robot>();
+            //robots.push_back(robot(robot1_config));
+            robots.push_back(robot(robot1_config));
+            robots.push_back(robot(robot1_config));
+            robots.push_back(robot(robot0_config));
+
+            //seq := playback_sequence(robots, "<A^A>^^AvvvA");
+            seq := playback_sequence(robots, "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A");
+
+            std::cout << "Day 21 output: (seq)$" << std::endl;
+
+
+            _ = robots; // Keep robots alive
+
+            for m_lines do (line) {
+                // FINISHME: Implement Day 21 solution here.
+                total += std::stoi(line);
+            }
+            return total;
         }
     }
 }
