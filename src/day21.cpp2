@@ -5,8 +5,8 @@ Day21: namespace = {
     export day : type = {
         this: Advent2024::day;
 
-        operator= : (out this,  lines, part_two, verbose, argint) = {
-            Advent2024::day = (lines, part_two, verbose, argint);
+        operator= : (out this,  lines, part_two, m_verbose, argint) = {
+            Advent2024::day = (lines, part_two, m_verbose, argint);
         }
 
         coords: type = {
@@ -275,12 +275,11 @@ Day21: namespace = {
             return output;
         }
 
-        expand_sequence: (this, movemap: std::unordered_map<u16, std::unordered_set<std::string>>, inseq: std::unordered_set<std::string>) -> std::unordered_set<std::string> = {
+        expand_sequence: (this, ourrobot: robot, inseq: std::unordered_set<std::string>) -> std::unordered_set<std::string> = {
             outseq := std::unordered_set<std::string>();
-            outlen: u32 = 999999999;
             workqueue := std::deque<std::pair<std::string, std::string>>();
             for inseq do (seq) {
-                _ = workqueue.emplace_back(std::make_pair(std::string(""), seq));
+                _ = workqueue.emplace_back(std::make_pair(std::string(""), "A" + seq));
             }
             while workqueue.size() {
                 this_pair := workqueue.front();
@@ -288,23 +287,18 @@ Day21: namespace = {
                 movestocome := this_pair.second;
                 if movestocome.length() < 2U {
                     // We're done. 
-                    thislen := stringsofar.length();
-                    if (thislen < outlen) {
+                    if outseq.size() == 0 || stringsofar.length() < outseq.begin()*.length() {
                         outseq.clear();
-                        outlen = thislen;
                     }
-                    if thislen == outlen {
+                    if outseq.size() == 0 || stringsofar.length() == outseq.begin()*.length() {
                         _ = outseq.insert(stringsofar);
                     }
                 }
                 else {
                     // Grab the current move.
                     nextmovehash: u16 = srcdst(movestocome[0], movestocome[1]).hash();
-                    if movemap.count(nextmovehash) == 0 {
-                        std::cout << "No moves for (movestocome[0])$ to (movestocome[1])$" << std::endl;
-                    }
-                    assert(movemap.count(nextmovehash) != 0);
-                    nextmoves := movemap.at(nextmovehash);
+                    assert(ourrobot.moves.count(nextmovehash) != 0);
+                    nextmoves := ourrobot.moves.at(nextmovehash);
                     for nextmoves do (thismove) {
                         _ = workqueue.emplace_back(stringsofar + thismove + "A", std::string(movestocome.data()+1, movestocome.length()-1));
                     }
@@ -314,53 +308,19 @@ Day21: namespace = {
             return outseq;
         }
 
-        expand_fast_by_one: (this, ourrobot: robot, movemap: std::unordered_map<u16, std::unordered_set<std::string>>, inseq: std::unordered_set<std::string>) -> std::unordered_set<std::string> = {
-            // First cache the expansion of all the moves.
-            std::cout << "Creating move cache... " << std::endl;
-            move_cache := std::unordered_map<u16, std::unordered_set<std::string>>();
-            for ourrobot.moves do (kv) {
-                key := kv.first;
-                value := ourrobot.moves.at(key);
-                expseq := expand_sequence(movemap, value);
-                move_cache[key] = expseq;
-                s := srcdst(key);
-                valvec := std::vector<std::string>();
-                for value do (item) {
-                    valvec.push_back(item);
-                }
-                valvec2 := std::vector<std::string>();
-                for expseq do (item) {
-                    valvec2.push_back(item);
-                }
-                std::cout << "From (s.src)$ to (s.dst)$ (0x(key:x)$): (valvec)$ -> (valvec2)$" << std::endl;
-            }
-            std::cout << "Move cache complete" << std::endl << std::endl;
-            std::cout << "Move cache contents:" << std::endl;
-            for move_cache do (kv) {
-                key := kv.first;
-                value := move_cache[key];
-                valvec := std::vector<std::string>();
-                for value do (item) {
-                    valvec.push_back(item);
-                }
-                s := srcdst(key);
-                std::cout << "From (s.src)$ to (s.dst)$ (0x(key:x)$): 0x(std::bit_cast<uint64_t>(move_cache[key]&):x)$ -> (valvec)$" << std::endl;
-            }
-            // Now expand the input sequence using the cached moves.
+        expand_fast_by_one: (this, ourrobot: robot, inseq: std::unordered_set<std::string>) -> std::unordered_set<std::string> = {
             outseq := std::unordered_set<std::string>();
             for inseq do (seq) {
                 instr := "A" + seq;
                 outstr: std::string = "";
                 for 0..<(instr.length() - 1) do (i) {
                     nextmovehash: u16 = srcdst(instr[i], instr[i+1]).hash();
-                    assert(move_cache.count(nextmovehash) != 0);
-                    nextmoves := move_cache[nextmovehash];
+                    assert(ourrobot.moves.count(nextmovehash) != 0);
+                    nextmoves := ourrobot.moves.at(nextmovehash);
                     valvec := std::vector<std::string>();
                     for nextmoves do (item) {
                         valvec.push_back(item);
                     }
-                    std::cout << "For move from (instr[i])$ to (instr[i+1])$ (0x(nextmovehash:x)$): moves are (valvec)$" << std::endl;
-                    std::cout << "For move from (instr[i])$ to (instr[i+1])$: adding (nextmoves.begin()*)$A" << std::endl;
                     outstr += nextmoves.begin()* + "A";
                 }
                 if outseq.size() == 0 || outstr.length() < outseq.begin()*.length() {
@@ -410,69 +370,48 @@ Day21: namespace = {
             //seq := playback_sequence(robots, "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A");
             //std::cout << "Day 21 output: (seq)$" << std::endl;
 
-            std::cout << "Robot 0 moves:" << std::endl;
-            for robot0.moves do (kv) {
-                key := kv.first;
-                value := kv.second;
-                valvec := std::vector<std::string>();
-                for value do (item) {
-                    valvec.push_back(item);
-                }
-                std::cout << " From (unchecked_narrow<char>(key >> 8))$ to (unchecked_narrow<char>(key & 0xFF))$: (valvec)$" << std::endl;
-            }
-            std::cout << std::endl;
-
-            std::cout << "Robot 1 moves:" << std::endl;
-            for robot1.moves do (kv) {
-                key := kv.first;
-                value := kv.second;
-                valvec := std::vector<std::string>();
-                for value do (item) {
-                    valvec.push_back(item);
-                }
-                std::cout << " From (unchecked_narrow<char>(key >> 8))$ to (unchecked_narrow<char>(key & 0xFF))$: (valvec)$" << std::endl;
-            }
-            std::cout << std::endl;
-
             robot01_moves := robot1.precompute_moves(robot0);
-            std::cout << "Robot 0 to Robot 1 moves:" << std::endl;
-            for robot01_moves do (kv) {
-                key := kv.first;
-                value := kv.second;
-                valvec := std::vector<std::string>();
-                for value do (item) {
-                    valvec.push_back(item);
-                }
-                std::cout << " From (unchecked_narrow<char>(key >> 8))$ to (unchecked_narrow<char>(key & 0xFF))$: (valvec)$" << std::endl;
-            }
-            std::cout << std::endl;
-
-            std::cout << "First generation:" << std::endl;
-            inseq := std::unordered_set<std::string>();
-            _ = inseq.insert("029A");
-            outseq := expand_sequence(robot01_moves, inseq);
-            valvec := std::vector<std::string>();
-            for outseq do (item) {
-                valvec.push_back(item);
-            }
-            std::cout << "Result: (valvec)$" << std::endl;
-            outseq2 := expand_fast_by_one(robot1, robot1.moves, outseq);
-            std::cout << "Second generation:" << std::endl;
-            for outseq2 do (line) {
-                std::cout << " (line)$" << std::endl;
-            }
-            outseq3 := expand_fast_by_one(robot1, robot1.moves, outseq2);
-            std::cout << "Third generation:" << std::endl;
-            for outseq3 do (line) {
-                std::cout << " (line)$" << std::endl;
-            }
-            std::cout << "(outseq3.size())$ options of length (outseq3.begin()*.size())$" << std::endl;
-            _ = robots; // Keep robots alive
 
             for m_lines do (line) {
-                // FINISHME: Implement Day 21 solution here.
-                total += std::stoi(line);
+                if m_verbose {
+                    std::cout << "Expanding line (line)$" << std::endl;
+                }
+                inseq := std::unordered_set<std::string>();
+                _ = inseq.insert(line);
+                //outseq := expand_fast_by_one(robot0, inseq);
+                outseq := expand_sequence(robot0, inseq);
+                if m_verbose {
+                    std::cout << "After first expansion, sequences are:" << std::endl;
+                    for outseq do (s) {
+                        std::cout << " (s)$" << std::endl;
+                    }
+                    std::cout << std::endl;
+                }
+                //outseq2 := expand_fast_by_one(robot1, outseq);
+                outseq2 := expand_sequence(robot1, outseq);
+                if m_verbose {
+                    std::cout << "After second expansion, sequences are:" << std::endl;
+                    for outseq2 do (s) {
+                        std::cout << " (s)$" << std::endl;
+                    }
+                    std::cout << std::endl;
+                }
+                //outseq3 := expand_fast_by_one(robot1, outseq2);
+                outseq3 := expand_sequence(robot1, outseq2);
+                if m_verbose {
+                    std::cout << "After third expansion, sequences are:" << std::endl;
+                    for outseq3 do (s) {
+                        std::cout << " (s)$" << std::endl;
+                    }
+                    std::cout << std::endl;
+                }
+                complexity := outseq3.begin()*.length() * std::stoi(line);
+                if m_verbose {
+                    std::cout << "Complexity for line (line)$ is (complexity)$" << std::endl;
+                }
+                total += complexity;
             }
+            _ = robots; // Keep robots alive
             return total;
         }
     }
