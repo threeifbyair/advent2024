@@ -34,31 +34,152 @@ Day21: namespace = {
             }
         }
 
+        srcdst : type = {
+            public src: char;
+            public dst: char;
+
+            hash: (this) -> u16 = {
+                return unchecked_narrow<u16>(unchecked_narrow<u8>(src) << 8 | unchecked_narrow<u8>(dst));
+            }
+            operator=: (out this, that) = {
+                this.src = that.src;
+                this.dst = that.dst;
+            }
+            operator=: (implicit out this) = {
+                this.src = 0;
+                this.dst = 0;
+            }
+            operator=: (out this, hash: u16) = {
+                this.src = unchecked_narrow<char>((hash >> 8) & 0xFF);
+                this.dst = unchecked_narrow<char>(hash & 0xFF);
+            }
+            operator=: (out this, src: char, dst: char) = {
+                this.src = src;
+                this.dst = dst;
+            }
+        }
+
         robot: type = {
             public keys: std::unordered_map<char, coords>;
             public reverse_keys: std::unordered_map<u64, char>;
             public position: coords;
+            public moves: std::unordered_map<u16, std::unordered_set<std::string>>; // Cache of moves between keys.
+
+
+            private move_x: (this, other: robot, copy src_coords: coords, dst_coords: coords, inout seq: std::string) -> coords = {
+                if (src_coords.x != dst_coords.x) {
+                    while (src_coords.x != dst_coords.x) {
+                        if (src_coords.x < dst_coords.x) {
+                            src_coords.x += 1;
+                            seq += '>';
+                        }
+                        else {
+                            src_coords.x -= 1;
+                            seq += '<';
+                        }
+                        if !other.reverse_keys.count(src_coords.hash()) {
+                            seq += 'X'; // Invalid path
+                            break;
+                        }
+                    }
+                }
+                return src_coords;
+            }
+
+            private move_y: (this, other: robot, copy src_coords: coords, dst_coords: coords, inout seq: std::string) -> coords = {
+                if (src_coords.y != dst_coords.y) {
+                    while (src_coords.y != dst_coords.y) {
+                        if (src_coords.y < dst_coords.y) {
+                            src_coords.y += 1;
+                            seq += 'v';
+                        }
+                        else {
+                            src_coords.y -= 1;
+                            seq += '^';
+                        }
+                        if !other.reverse_keys.count(src_coords.hash()) {
+                            seq += 'X'; // Invalid path
+                            break;
+                        }
+                    }
+                }
+                return src_coords;
+            }
+
+            private find_moves: (this, other: robot, src: char, dst: char) -> std::unordered_set<std::string> = {
+                // We assume that the fastest way will be either row-column or column-row.
+                src_coords := other.keys.at(src);
+                dst_coords := other.keys.at(dst);
+
+                // First try row-col.
+                rowcolseq: std::string = "";
+                new_coords := move_x(other, src_coords, dst_coords, rowcolseq);
+                new_coords = move_y(other, new_coords, dst_coords, rowcolseq);
+                assert(new_coords.x == dst_coords.x && new_coords.y == dst_coords.y);
+                // Now try col-row.
+                colrowseq: std::string = "";
+                new_coords = move_y(other, src_coords, dst_coords, colrowseq);
+                new_coords = move_x(other, new_coords, dst_coords, colrowseq);
+                assert(new_coords.x == dst_coords.x && new_coords.y == dst_coords.y);
+                outvec := std::unordered_set<std::string>();
+                if rowcolseq.find("X") == std::string::npos {
+                    _ = outvec.insert(rowcolseq);
+                }
+                if colrowseq.find("X") == std::string::npos {
+                    _ = outvec.insert(colrowseq);
+                }
+                return outvec;  
+            }
+
+            precompute_moves: (this, other: robot) -> std::unordered_map<u16, std::unordered_set<std::string>> = {
+                outmoves := std::unordered_map<u16, std::unordered_set<std::string>>();
+                // Precompute all the moves between keys.
+                for other.keys do (src_kv) {
+                    src_key := src_kv.first;
+                    for other.keys do (dst_kv) {
+                        dst_key := dst_kv.first;
+                        move_seq : std::unordered_set<std::string>;
+                        if src_key != dst_key {
+                            move_seq = find_moves(other, src_key, dst_key);
+                        } else {
+                            move_seq = std::unordered_set<std::string>();
+                            _ = move_seq.insert("");
+                        }
+                        outmoves[srcdst(src_key, dst_key).hash()] = move_seq;
+                    }
+                }
+                return outmoves;
+            }
 
             operator=: (out this, keys_in: std::unordered_map<char, coords>) = {
                 keys = keys_in;
                 reverse_keys = std::unordered_map<u64, char>();
                 position = keys['A'];
+                moves = std::unordered_map<u16, std::unordered_set<std::string>>();
                 for keys do (kv) {
                     key := kv.first;
                     value := kv.second;
                     reverse_keys[value.hash()] = key;
                 }
+                moves = precompute_moves(this);
             }
+
+
+
             operator=: (implicit out this) = {
                 keys = std::unordered_map<char, coords>();
                 reverse_keys = std::unordered_map<u64, char>();
                 position = coords(0,0);
+                moves = std::unordered_map<u16, std::unordered_set<std::string>>();
             }
+
             operator=: (out this, that) = {
                 keys = that.keys;
                 reverse_keys = that.reverse_keys;
                 position = that.position;
+                moves = that.moves;
             }
+
             display: (this) = {
                 for 0..<4 do (y) {
                     for 0..<3 do (x) {
@@ -154,6 +275,105 @@ Day21: namespace = {
             return output;
         }
 
+        expand_sequence: (this, movemap: std::unordered_map<u16, std::unordered_set<std::string>>, inseq: std::unordered_set<std::string>) -> std::unordered_set<std::string> = {
+            outseq := std::unordered_set<std::string>();
+            outlen: u32 = 999999999;
+            workqueue := std::deque<std::pair<std::string, std::string>>();
+            for inseq do (seq) {
+                _ = workqueue.emplace_back(std::make_pair(std::string(""), seq));
+            }
+            while workqueue.size() {
+                this_pair := workqueue.front();
+                stringsofar := this_pair.first;
+                movestocome := this_pair.second;
+                if movestocome.length() < 2U {
+                    // We're done. 
+                    thislen := stringsofar.length();
+                    if (thislen < outlen) {
+                        outseq.clear();
+                        outlen = thislen;
+                    }
+                    if thislen == outlen {
+                        _ = outseq.insert(stringsofar);
+                    }
+                }
+                else {
+                    // Grab the current move.
+                    nextmovehash: u16 = srcdst(movestocome[0], movestocome[1]).hash();
+                    if movemap.count(nextmovehash) == 0 {
+                        std::cout << "No moves for (movestocome[0])$ to (movestocome[1])$" << std::endl;
+                    }
+                    assert(movemap.count(nextmovehash) != 0);
+                    nextmoves := movemap.at(nextmovehash);
+                    for nextmoves do (thismove) {
+                        _ = workqueue.emplace_back(stringsofar + thismove + "A", std::string(movestocome.data()+1, movestocome.length()-1));
+                    }
+                }
+                workqueue.pop_front();
+            }
+            return outseq;
+        }
+
+        expand_fast_by_one: (this, ourrobot: robot, movemap: std::unordered_map<u16, std::unordered_set<std::string>>, inseq: std::unordered_set<std::string>) -> std::unordered_set<std::string> = {
+            // First cache the expansion of all the moves.
+            std::cout << "Creating move cache... " << std::endl;
+            move_cache := std::unordered_map<u16, std::unordered_set<std::string>>();
+            for ourrobot.moves do (kv) {
+                key := kv.first;
+                value := ourrobot.moves.at(key);
+                expseq := expand_sequence(movemap, value);
+                move_cache[key] = expseq;
+                s := srcdst(key);
+                valvec := std::vector<std::string>();
+                for value do (item) {
+                    valvec.push_back(item);
+                }
+                valvec2 := std::vector<std::string>();
+                for expseq do (item) {
+                    valvec2.push_back(item);
+                }
+                std::cout << "From (s.src)$ to (s.dst)$ (0x(key:x)$): (valvec)$ -> (valvec2)$" << std::endl;
+            }
+            std::cout << "Move cache complete" << std::endl << std::endl;
+            std::cout << "Move cache contents:" << std::endl;
+            for move_cache do (kv) {
+                key := kv.first;
+                value := move_cache[key];
+                valvec := std::vector<std::string>();
+                for value do (item) {
+                    valvec.push_back(item);
+                }
+                s := srcdst(key);
+                std::cout << "From (s.src)$ to (s.dst)$ (0x(key:x)$): 0x(std::bit_cast<uint64_t>(move_cache[key]&):x)$ -> (valvec)$" << std::endl;
+            }
+            // Now expand the input sequence using the cached moves.
+            outseq := std::unordered_set<std::string>();
+            for inseq do (seq) {
+                instr := "A" + seq;
+                outstr: std::string = "";
+                for 0..<(instr.length() - 1) do (i) {
+                    nextmovehash: u16 = srcdst(instr[i], instr[i+1]).hash();
+                    assert(move_cache.count(nextmovehash) != 0);
+                    nextmoves := move_cache[nextmovehash];
+                    valvec := std::vector<std::string>();
+                    for nextmoves do (item) {
+                        valvec.push_back(item);
+                    }
+                    std::cout << "For move from (instr[i])$ to (instr[i+1])$ (0x(nextmovehash:x)$): moves are (valvec)$" << std::endl;
+                    std::cout << "For move from (instr[i])$ to (instr[i+1])$: adding (nextmoves.begin()*)$A" << std::endl;
+                    outstr += nextmoves.begin()* + "A";
+                }
+                if outseq.size() == 0 || outstr.length() < outseq.begin()*.length() {
+                    outseq.clear();
+                }
+                if outseq.size() == 0 || outstr.length() == outseq.begin()*.length() {
+                    _ = outseq.insert(outstr);
+                }
+            }
+
+            return outseq;
+        }
+
         run : (override inout this) -> i64 = {
             total : i64 = 0;
             // First, let's find the quickest way to do any particular task.
@@ -180,18 +400,73 @@ Day21: namespace = {
             robot1_config['v'] = coords(1,1);
             robot1_config['>'] = coords(2,1);
 
+            robot0 := robot(robot0_config);
+            robot1 := robot(robot1_config);
             robots := std::vector<robot>();
-            //robots.push_back(robot(robot1_config));
-            robots.push_back(robot(robot1_config));
-            robots.push_back(robot(robot1_config));
-            robots.push_back(robot(robot0_config));
+            robots.push_back(robot1);
+            robots.push_back(robot1);
+            robots.push_back(robot0);
 
-            //seq := playback_sequence(robots, "<A^A>^^AvvvA");
-            seq := playback_sequence(robots, "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A");
+            //seq := playback_sequence(robots, "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A");
+            //std::cout << "Day 21 output: (seq)$" << std::endl;
 
-            std::cout << "Day 21 output: (seq)$" << std::endl;
+            std::cout << "Robot 0 moves:" << std::endl;
+            for robot0.moves do (kv) {
+                key := kv.first;
+                value := kv.second;
+                valvec := std::vector<std::string>();
+                for value do (item) {
+                    valvec.push_back(item);
+                }
+                std::cout << " From (unchecked_narrow<char>(key >> 8))$ to (unchecked_narrow<char>(key & 0xFF))$: (valvec)$" << std::endl;
+            }
+            std::cout << std::endl;
 
+            std::cout << "Robot 1 moves:" << std::endl;
+            for robot1.moves do (kv) {
+                key := kv.first;
+                value := kv.second;
+                valvec := std::vector<std::string>();
+                for value do (item) {
+                    valvec.push_back(item);
+                }
+                std::cout << " From (unchecked_narrow<char>(key >> 8))$ to (unchecked_narrow<char>(key & 0xFF))$: (valvec)$" << std::endl;
+            }
+            std::cout << std::endl;
 
+            robot01_moves := robot1.precompute_moves(robot0);
+            std::cout << "Robot 0 to Robot 1 moves:" << std::endl;
+            for robot01_moves do (kv) {
+                key := kv.first;
+                value := kv.second;
+                valvec := std::vector<std::string>();
+                for value do (item) {
+                    valvec.push_back(item);
+                }
+                std::cout << " From (unchecked_narrow<char>(key >> 8))$ to (unchecked_narrow<char>(key & 0xFF))$: (valvec)$" << std::endl;
+            }
+            std::cout << std::endl;
+
+            std::cout << "First generation:" << std::endl;
+            inseq := std::unordered_set<std::string>();
+            _ = inseq.insert("029A");
+            outseq := expand_sequence(robot01_moves, inseq);
+            valvec := std::vector<std::string>();
+            for outseq do (item) {
+                valvec.push_back(item);
+            }
+            std::cout << "Result: (valvec)$" << std::endl;
+            outseq2 := expand_fast_by_one(robot1, robot1.moves, outseq);
+            std::cout << "Second generation:" << std::endl;
+            for outseq2 do (line) {
+                std::cout << " (line)$" << std::endl;
+            }
+            outseq3 := expand_fast_by_one(robot1, robot1.moves, outseq2);
+            std::cout << "Third generation:" << std::endl;
+            for outseq3 do (line) {
+                std::cout << " (line)$" << std::endl;
+            }
+            std::cout << "(outseq3.size())$ options of length (outseq3.begin()*.size())$" << std::endl;
             _ = robots; // Keep robots alive
 
             for m_lines do (line) {

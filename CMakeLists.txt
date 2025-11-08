@@ -74,6 +74,9 @@ if(Boost_FOUND)
     target_include_directories(advent2024 PRIVATE ${Boost_INCLUDE_DIRS})
     target_link_libraries(advent2024 PRIVATE Boost::program_options)
 
+    #target_compile_options(advent2024 PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    #target_link_options(advent2024 PRIVATE -fsanitize=address)
+
     # Include directories
     include_directories(include)
     include_directories(/home/abell/src/cppfront/include)
