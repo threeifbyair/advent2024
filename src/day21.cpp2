@@ -59,11 +59,60 @@ Day21: namespace = {
             }
         }
 
+        moveset: type == std::unordered_set<std::string>;
+        movemap: type == std::unordered_map<u16, moveset>;
+        movecountmap: type == std::unordered_map<u16, u64>;
+
+        movecount: type = {
+            public map: movecountmap;
+            public last: char;
+            operator=: (out this, that) = {
+                this.map = that.map;
+                this.last = that.last;
+            }
+            operator=: (implicit out this) = {
+                this.map = movecountmap();
+                this.last = 0;
+            }
+            operator=: (out this, map: movecountmap, last: char) = {
+                this.map = map;
+                this.last = last;
+            }
+
+            operator[]: (inout this, key: u16) -> forward_ref _ = {
+                return map[key];
+            }
+            at: (this, key: u16) -> int = {
+                return map.at(key);
+            }
+            count: (this, key: u16) -> int = {
+                return map.count(key);
+            }
+            begin: (this) -> movecountmap::const_iterator = {
+                return map.begin();
+            }
+            end: (this) -> movecountmap::const_iterator = {
+                return map.end();
+            }
+            size: (this) -> size_t = {
+                return map.size();
+            }
+
+            display: (this) = {
+                for map do (kv) {
+                    std::cout << " Move (kv.first >> 8:c)$(kv.first & 0xFF:c)$: (kv.second)$" << std::endl;
+                }
+                std::cout << " Last move: (last:c)$" << std::endl;
+            }
+        }
+
+        movegraph: type == std::unordered_map<u16, movecount>;
+
         robot: type = {
             public keys: std::unordered_map<char, coords>;
             public reverse_keys: std::unordered_map<u64, char>;
             public position: coords;
-            public moves: std::unordered_map<u16, std::unordered_set<std::string>>; // Cache of moves between keys.
+            public moves: movemap; // Cache of moves between keys.
 
 
             private move_x: (this, other: robot, copy src_coords: coords, dst_coords: coords, inout seq: std::string) -> coords = {
@@ -106,7 +155,7 @@ Day21: namespace = {
                 return src_coords;
             }
 
-            private find_moves: (this, other: robot, src: char, dst: char) -> std::unordered_set<std::string> = {
+            private find_moves: (this, other: robot, src: char, dst: char) -> moveset = {
                 // We assume that the fastest way will be either row-column or column-row.
                 src_coords := other.keys.at(src);
                 dst_coords := other.keys.at(dst);
@@ -121,7 +170,7 @@ Day21: namespace = {
                 new_coords = move_y(other, src_coords, dst_coords, colrowseq);
                 new_coords = move_x(other, new_coords, dst_coords, colrowseq);
                 assert(new_coords.x == dst_coords.x && new_coords.y == dst_coords.y);
-                outvec := std::unordered_set<std::string>();
+                outvec := moveset();
                 if rowcolseq.find("X") == std::string::npos {
                     _ = outvec.insert(rowcolseq);
                 }
@@ -131,18 +180,18 @@ Day21: namespace = {
                 return outvec;  
             }
 
-            precompute_moves: (this, other: robot) -> std::unordered_map<u16, std::unordered_set<std::string>> = {
-                outmoves := std::unordered_map<u16, std::unordered_set<std::string>>();
+            precompute_moves: (this, other: robot) -> movemap = {
+                outmoves := movemap();
                 // Precompute all the moves between keys.
                 for other.keys do (src_kv) {
                     src_key := src_kv.first;
                     for other.keys do (dst_kv) {
                         dst_key := dst_kv.first;
-                        move_seq : std::unordered_set<std::string>;
+                        move_seq : moveset;
                         if src_key != dst_key {
                             move_seq = find_moves(other, src_key, dst_key);
                         } else {
-                            move_seq = std::unordered_set<std::string>();
+                            move_seq = moveset();
                             _ = move_seq.insert("");
                         }
                         outmoves[srcdst(src_key, dst_key).hash()] = move_seq;
@@ -151,11 +200,31 @@ Day21: namespace = {
                 return outmoves;
             }
 
+            graph_from_moves: (this, moves: movemap) -> movegraph = {
+                outgraph := movegraph();
+                // Precompute all the moves between keys.
+                for moves do (kv) {
+                    movehash := kv.first;
+                    moveseqset := kv.second;
+                    ourmove := "A" + moveseqset.begin()* + "A";
+                    outgraph[movehash] = movecount();
+                    for 0..<ourmove.length() - 1 do (i) {
+                        nextmovehash: u16 = srcdst(ourmove[i], ourmove[i+1]).hash();
+                        if !outgraph[movehash].count(nextmovehash) {
+                            outgraph[movehash][nextmovehash] = 0;
+                        }
+                        outgraph[movehash][nextmovehash] += 1;
+                    }
+                    outgraph[movehash].last = ourmove[ourmove.length() - 1];
+                }
+                return outgraph;
+            }
+
             operator=: (out this, keys_in: std::unordered_map<char, coords>) = {
                 keys = keys_in;
                 reverse_keys = std::unordered_map<u64, char>();
                 position = keys['A'];
-                moves = std::unordered_map<u16, std::unordered_set<std::string>>();
+                moves = movemap();
                 for keys do (kv) {
                     key := kv.first;
                     value := kv.second;
@@ -170,7 +239,7 @@ Day21: namespace = {
                 keys = std::unordered_map<char, coords>();
                 reverse_keys = std::unordered_map<u64, char>();
                 position = coords(0,0);
-                moves = std::unordered_map<u16, std::unordered_set<std::string>>();
+                moves = movemap();
             }
 
             operator=: (out this, that) = {
@@ -241,7 +310,6 @@ Day21: namespace = {
                         }
                         assert(i == robots.size() - 1);
                         output += ch;
-                        std::cout << "ZZZ Got output '(ch)$', current output is '(output)$'" << std::endl;
                         break robot_loop;
                     }
                     if ch == 'A' {
@@ -275,8 +343,8 @@ Day21: namespace = {
             return output;
         }
 
-        expand_sequence: (this, ourrobot: robot, inseq: std::unordered_set<std::string>) -> std::unordered_set<std::string> = {
-            outseq := std::unordered_set<std::string>();
+        expand_sequence: (this, ourrobot: robot, inseq: moveset) -> moveset = {
+            outseq := moveset();
             workqueue := std::deque<std::pair<std::string, std::string>>();
             for inseq do (seq) {
                 _ = workqueue.emplace_back(std::make_pair(std::string(""), "A" + seq));
@@ -308,8 +376,8 @@ Day21: namespace = {
             return outseq;
         }
 
-        expand_fast_by_one: (this, ourrobot: robot, inseq: std::unordered_set<std::string>) -> std::unordered_set<std::string> = {
-            outseq := std::unordered_set<std::string>();
+        expand_fast_by_one: (this, ourrobot: robot, inseq: moveset) -> moveset = {
+            outseq := moveset();
             for inseq do (seq) {
                 instr := "A" + seq;
                 outstr: std::string = "";
@@ -317,10 +385,6 @@ Day21: namespace = {
                     nextmovehash: u16 = srcdst(instr[i], instr[i+1]).hash();
                     assert(ourrobot.moves.count(nextmovehash) != 0);
                     nextmoves := ourrobot.moves.at(nextmovehash);
-                    valvec := std::vector<std::string>();
-                    for nextmoves do (item) {
-                        valvec.push_back(item);
-                    }
                     outstr += nextmoves.begin()* + "A";
                 }
                 if outseq.size() == 0 || outstr.length() < outseq.begin()*.length() {
@@ -334,31 +398,73 @@ Day21: namespace = {
             return outseq;
         }
 
+        graph_from_sequence: (this, seq: std::string) -> movecount = {
+            ourgraph := movecount();
+            inseq := "A" + seq;
+            for 0..<(inseq.length() - 1) do (i) {
+                nextmovehash: u16 = srcdst(inseq[i], inseq[i+1]).hash();
+                if !ourgraph.count(nextmovehash) {
+                    ourgraph[nextmovehash] = 0;
+                }
+                ourgraph[nextmovehash] += 1;
+            }
+            ourgraph.last = inseq[inseq.length() - 1];
+            return ourgraph;
+        }
+
+        expand_graph_from_moves: (this, graph: movecount, moves: movegraph) -> movecount = {
+            outgraph := movecount();
+
+            for graph do (kv) {
+                movehash := kv.first;
+                count := kv.second;
+                assert(moves.count(movehash) != 0);
+                movemap := moves.at(movehash);
+                for movemap do (mvkv) {
+                    moveseq := mvkv.first;
+                    movecount := mvkv.second;
+                    if !outgraph.count(moveseq) {
+                        outgraph[moveseq] = 0;
+                    }
+                    outgraph[moveseq] += count * movecount;
+                }
+            }
+            // And now set the last character.
+            lastmovehash: u16 = srcdst(graph.last, 'A').hash();
+            assert(moves.count(lastmovehash) != 0);
+            lastmovemap := moves.at(lastmovehash);
+            outgraph.last = lastmovemap.last;
+
+            return outgraph;
+        }
+
         run : (override inout this) -> i64 = {
             total : i64 = 0;
             // First, let's find the quickest way to do any particular task.
             // We assume that it's always quicker to turn just once.
             
             // Configuration of robots.
-            robot0_config: std::unordered_map<char, coords> = ();
-            robot0_config['A'] = coords(2,3);
-            robot0_config['0'] = coords(1,3);
-            robot0_config['1'] = coords(0,2);
-            robot0_config['2'] = coords(1,2);
-            robot0_config['3'] = coords(2,2);
-            robot0_config['4'] = coords(0,1);
-            robot0_config['5'] = coords(1,1);
-            robot0_config['6'] = coords(2,1);
-            robot0_config['7'] = coords(0,0);
-            robot0_config['8'] = coords(1,0);
-            robot0_config['9'] = coords(2,0);
+            robot0_config: std::unordered_map<char, coords> = (
+                ('A', (2,3)),
+                ('0', (1,3)),
+                ('1', (0,2)),
+                ('2', (1,2)),
+                ('3', (2,2)),
+                ('4', (0,1)),
+                ('5', (1,1)),
+                ('6', (2,1)),
+                ('7', (0,0)),
+                ('8', (1,0)),
+                ('9', (2,0))
+            );
 
-            robot1_config: std::unordered_map<char, coords> = ();
-            robot1_config['A'] = coords(2,0);
-            robot1_config['^'] = coords(1,0);
-            robot1_config['<'] = coords(0,1);
-            robot1_config['v'] = coords(1,1);
-            robot1_config['>'] = coords(2,1);
+            robot1_config: std::unordered_map<char, coords> = (
+                ('A', (2,0)),
+                ('^', (1,0)),
+                ('<', (0,1)),
+                ('v', (1,1)),
+                ('>', (2,1))
+            );
 
             robot0 := robot(robot0_config);
             robot1 := robot(robot1_config);
@@ -371,12 +477,29 @@ Day21: namespace = {
             //std::cout << "Day 21 output: (seq)$" << std::endl;
 
             robot01_moves := robot1.precompute_moves(robot0);
+            
+            robot1_graph := robot1.graph_from_moves(robot1.moves);
+
+            if m_verbose {
+                std::cout << "Robot1 graph:" << std::endl;
+                for robot1_graph do (kv) {
+                    std::cout << " Move (kv.first >> 8:c)$(kv.first & 0xFF:c)$: (kv.second)$" << std::endl;
+                }
+                std::cout << std::endl;
+            }
+            reps: int;
+            if m_part_two {
+                reps = 3;
+            }
+            else {
+                reps = 2;
+            }
 
             for m_lines do (line) {
                 if m_verbose {
                     std::cout << "Expanding line (line)$" << std::endl;
                 }
-                inseq := std::unordered_set<std::string>();
+                inseq := moveset();
                 _ = inseq.insert(line);
                 //outseq := expand_fast_by_one(robot0, inseq);
                 outseq := expand_sequence(robot0, inseq);
@@ -387,29 +510,64 @@ Day21: namespace = {
                     }
                     std::cout << std::endl;
                 }
-                //outseq2 := expand_fast_by_one(robot1, outseq);
-                outseq2 := expand_sequence(robot1, outseq);
+                outgraphs := std::vector<movecount>();
+                for outseq do (s) {
+                    outgraphs.push_back(graph_from_sequence(s));
+                }
                 if m_verbose {
-                    std::cout << "After second expansion, sequences are:" << std::endl;
-                    for outseq2 do (s) {
-                        std::cout << " (s)$" << std::endl;
+                    std::cout << "After first expansion, graphs are:" << std::endl;
+                    for outgraphs do (outgraph) {
+                        outgraph.display();
+                        std::cout << std::endl;
                     }
-                    std::cout << std::endl;
                 }
-                //outseq3 := expand_fast_by_one(robot1, outseq2);
-                outseq3 := expand_sequence(robot1, outseq2);
-                if m_verbose {
-                    std::cout << "After third expansion, sequences are:" << std::endl;
-                    for outseq3 do (s) {
-                        std::cout << " (s)$" << std::endl;
+                for 0..<reps do (i) {
+                    newoutgraphs := std::vector<movecount>();
+                    for outgraphs do (outgraph) {
+                        newoutgraphs.push_back(expand_graph_from_moves(outgraph, robot1_graph));
                     }
-                    std::cout << std::endl;
+                    if m_verbose {
+                        std::cout << "After repetition (i)$, graphs are:" << std::endl;
+                        for newoutgraphs do (outgraph) {
+                            outgraph.display();
+                            std::cout << std::endl;
+                        }
+                    }
+                    //newoutseq := expand_fast_by_one(robot1, outseq);
+                    newoutseq := expand_sequence(robot1, outseq);
+                    if m_verbose {
+                        std::cout << "After repetition (i)$, sequences are:" << std::endl;
+                        for newoutseq do (s) {
+                            std::cout << " (s)$" << std::endl;
+                        }
+                        std::cout << std::endl;
+                    }
+                    outseq = newoutseq;
+                    outgraphs = newoutgraphs;
                 }
-                complexity := outseq3.begin()*.length() * std::stoi(line);
+                complexity_old := outseq.begin()*.length() * std::stoi(line);
+                complexity : u64 = (1ULL << 63) - 1;
+                for outgraphs do (outgraph) {
+                    graph_complexity: u64 = 0;
+                    for outgraph do (kv) {
+                        graph_complexity += kv.second;
+                    }
+                    if m_verbose {
+                        std::cout << "Graph of (line)$ (complexity (graph_complexity)$):" << std::endl;
+                        outgraph.display();
+                        std::cout << std::endl;
+                    }
+                    if graph_complexity < complexity {
+                        complexity = graph_complexity;
+                    }
+                }
+                overall_complexity: u64 = complexity * std::stoi(line);
+
                 if m_verbose {
-                    std::cout << "Complexity for line (line)$ is (complexity)$" << std::endl;
+                    std::cout << "Complexity in old algorithm for line (line)$ is (complexity_old)$" << std::endl;
+                    std::cout << "Complexity for line (line)$ is (complexity)$ * (std::stoi(line))$ = (overall_complexity)$" << std::endl;
                 }
-                total += complexity;
+                total += overall_complexity;
             }
             _ = robots; // Keep robots alive
             return total;
