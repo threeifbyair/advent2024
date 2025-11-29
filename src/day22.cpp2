@@ -9,9 +9,47 @@ Day22: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        generate_one_secret: (old_secret: u32, shift: i8) -> u32 = {
+            secret: u32;
+            if shift < 0 {
+                secret = old_secret >> -shift;
+            }
+            else {
+                secret = old_secret << shift;
+            }
+            return (secret ^ old_secret) & 0xFFFFFF;
+        }
+
+        generate_secret: (old_secret: u32) -> u32 = {
+            secret := generate_one_secret(old_secret, 6);
+            secret = generate_one_secret(secret, -5);
+            secret = generate_one_secret(secret, 11);
+            return secret;
+        }
+
         run : (override inout this) -> i64 = {
-            std::cout << "Not implemented yet!";
-            return -42;
+            total: i64 = 0;
+            repeat := m_argint;
+            if repeat == 0 {
+                repeat = 2000;
+            }
+            for m_lines do (line) {
+                secret: u32 = cpp2::unchecked_narrow<u32>(std::stoul(line));
+                if m_verbose {
+                    std::cout << "Using secret (secret)$ and permuting (repeat)$ times" << std::endl; 
+                }
+                for 0..<repeat do (i) {
+                    secret = generate_secret(secret);
+                    if m_verbose {
+                        std::cout << "After (i+1)$ iterations, secret is (secret)$" << std::endl;
+                    }
+                }
+                if m_verbose {
+                    std::cout << "Final secret is (secret)$" << std::endl;
+                }
+                total += secret;
+            }
+            return total;
         }
     }
 }
