@@ -32,6 +32,15 @@ Day21: namespace = {
                 this.x = x;
                 this.y = y;
             }
+            operator==: (this, that) -> bool = {
+                return this.x == that.x && this.y == that.y;
+            }
+            operator+: (this, that) -> coords = {
+                return coords(this.x + that.x, this.y + that.y);
+            }
+            operator-: (this, that) -> coords = {
+                return coords(this.x - that.x, this.y - that.y);
+            }
         }
 
         srcdst : type = {
@@ -59,8 +68,11 @@ Day21: namespace = {
             }
         }
 
+        robotconfig: type == std::unordered_map<char, coords>;
+
         moveset: type == std::unordered_set<std::string>;
         movemap: type == std::unordered_map<u16, moveset>;
+        directmovemap: type == std::unordered_map<u16, std::string>;
         movecountmap: type == std::unordered_map<u16, u64>;
 
         movecount: type = {
@@ -109,7 +121,7 @@ Day21: namespace = {
         movegraph: type == std::unordered_map<u16, movecount>;
 
         robot: type = {
-            public keys: std::unordered_map<char, coords>;
+            public keys: robotconfig;
             public reverse_keys: std::unordered_map<u64, char>;
             public position: coords;
             public moves: movemap; // Cache of moves between keys.
@@ -193,6 +205,7 @@ Day21: namespace = {
             }
 
             optimize_moveset: (this, ourmoves: movemap, other: robot) -> movemap = {
+            //optimize_moveset: (this, ourmoves: movemap, other: robot, saved_moves: directmovemap) -> movemap = {
                 // Expand each moveset by one repetition, and keep only the shortest ones.
                 outmoves := movemap();
                 for ourmoves do (kv) {
@@ -205,23 +218,46 @@ Day21: namespace = {
             }
 
             optimize_moveset_single: (this, ourmoves: moveset, other: robot) -> moveset = {
+            //optimize_moveset_single: (this, ourmoves: moveset, other: robot, saved_moves: directmovemap) -> moveset = {
                 outmoves := moveset();
                 outinmoves := moveset();
                 min_length: size_t = (1ULL << 63) - 1;
                 for ourmoves do (mv) {
-                    mvset : moveset = (mv);
-                    expanded_move := other.expand_sequence(mvset);
-                    for expanded_move do (mv2) {
-                        if mv2.length() < min_length {
-                            min_length = mv2.length();
+                    /*if other == this && mv.length() >= 2U && saved_moves.count(srcdst(mv[0], mv[1]).hash()) != 0 {
+                        // Optimize using our own optimized moves.
+                        optimized_mv: std::string = "";
+                        for 0..<(mv.length() - 1) do (i) {
+                            from_ch: char = mv[i];
+                            to_ch: char = mv[i+1];
+                            h: u16 = srcdst(from_ch, to_ch).hash();
+                            optimized_mv += saved_moves.at(h);
+                        }
+                            if optimized_mv.length() < min_length {
+                            min_length = optimized_mv.length();
                             outmoves.clear();
                             outinmoves.clear();
                         }
-                        if mv2.length() == min_length {
-                            _ = outmoves.insert(mv2);
+                        if optimized_mv.length() == min_length {
+                            _ = outmoves.insert(optimized_mv);
                             _ = outinmoves.insert(mv);
                         }
                     }
+                    else {
+                    */
+                        // Expand normally.
+                        expanded_move := other.expand_sequence(moveset( (mv) ));
+                        for expanded_move do (mv2) {
+                            if mv2.length() < min_length {
+                                min_length = mv2.length();
+                                outmoves.clear();
+                                outinmoves.clear();
+                            }
+                            if mv2.length() == min_length {
+                                _ = outmoves.insert(mv2);
+                                _ = outinmoves.insert(mv);
+                            }
+                        }
+                    //}
                 }
                 return outinmoves;
             }
@@ -266,7 +302,8 @@ Day21: namespace = {
                 return outgraph;
             }
 
-            operator=: (out this, keys_in: std::unordered_map<char, coords>) = {
+            operator=: (out this, keys_in: robotconfig) = {
+            //operator=: (out this, keys_in: robotconfig, optimized: std::optional<directmovemap> = std::nullopt) = {
                 keys = keys_in;
                 reverse_keys = std::unordered_map<u64, char>();
                 position = keys['A'];
@@ -276,13 +313,25 @@ Day21: namespace = {
                     value := kv.second;
                     reverse_keys[value.hash()] = key;
                 }
-                moves = precompute_moves(this);
+                /*
+                if optimized.has_value() {
+                    for optimized.value() do (kv) {
+                        key := kv.first;
+                        value := kv.second;
+                        moves[key] = moveset();
+                        _ = moves[key].insert(value);
+                    }
+                }
+                else {
+                */
+                    moves = precompute_moves(this);
+                //}
             }
 
 
 
             operator=: (implicit out this) = {
-                keys = std::unordered_map<char, coords>();
+                keys = robotconfig();
                 reverse_keys = std::unordered_map<u64, char>();
                 position = coords(0,0);
                 moves = movemap();
@@ -293,6 +342,10 @@ Day21: namespace = {
                 reverse_keys = that.reverse_keys;
                 position = that.position;
                 moves = that.moves;
+            }
+
+            operator==: (this, that) -> bool = {
+                return this.keys == that.keys && this.position == that.position && this.moves == that.moves;
             }
 
             expand_sequence: (this, inseq: moveset) -> moveset = {
@@ -484,13 +537,151 @@ Day21: namespace = {
             return outgraph;
         }
 
+        // Borrowed version.
+        move_map_t: type == std::unordered_map<u64, char>;
+
+        move_map: const move_map_t = ( ( coords( 1, 0 ).hash(), '>' ),
+                                    ( coords( 0, 1 ).hash(), 'v' ),
+                                    ( coords( -1, 0 ).hash(), '<' ),
+                                    ( coords( 0, -1 ).hash(), '^' ),
+                                    ( coords( 0, 0 ).hash(), 'A' ) );
+        char_row_t: type == std::vector<char>;
+        codes_list_t: type == std::vector<char_row_t>;
+
+        memo_inputs: @struct type = {
+            key: char;
+            pos: coords;
+            iter: int;
+            hash: (this) -> size_t = {
+                return std::hash<char>()(key) ^ (pos.hash() << 8u) ^ (std::hash<int>()(iter) << 24u);
+            }
+        }
+
+        memo_map_t: type == std::unordered_map<size_t, int64_t>;
+
+        //this returns the sequence of moves to go from current -> desired_1 -> desired_2
+        //the order of the moves is step1 and then step2 (X then Y or Y then X)
+        //forbid is the empty space that we are not allowed to move to
+        //if we enter forbid then return vector is empty
+        compute_moves: (this, step1: coords, step2: coords, copy current: coords, desired_1: coords, desired_2: coords, forbid: coords) -> char_row_t =
+        {
+            moves_vector := char_row_t();
+            while (step1 != coords(0, 0) && current != desired_1) {
+                current = current + step1;
+                h := step1.hash();
+                moves_vector.push_back(move_map.at(h));
+                if current == forbid {
+                    return char_row_t();
+                }
+            }
+            while (step2 != coords(0, 0) && current != desired_2) {
+                current = current + step2;
+                h := step2.hash();
+                moves_vector.push_back(move_map.at(h));
+                if current == forbid {
+                    return char_row_t();
+                }
+            }
+            moves_vector.push_back(move_map.at(coords(0, 0).hash()));
+            return moves_vector;
+        }
+
+        //this returns either 1 or 2 possible moves to get to the desired key
+        //for example <<^A or ^<<A
+        //<^<A is never omptimal so it is never considered
+        compute_all_moves: (this, keys: robotconfig, key: char, copy current_pos: coords, forbid: coords) -> codes_list_t =
+        {
+            all_moves := codes_list_t();
+
+            desired_pos: coords = keys.at(key);
+            diff: coords = desired_pos - current_pos;
+            x_step: coords;
+            if diff.x == 0 {
+                x_step = coords(0, 0);
+            } else {
+                x_step = coords(diff.x / std::abs(diff.x), 0);
+            }
+            y_step: coords;
+            if diff.y == 0 {
+                y_step = coords(0, 0);
+            } else {
+                y_step = coords(0, diff.y / std::abs(diff.y));
+            }
+
+            //2 options
+            step1: coords = x_step;
+            desired_1: coords = coords(desired_pos.x, current_pos.y);
+
+            step2: coords = y_step;
+            desired_2: coords = coords(current_pos.x, desired_pos.y);
+            move1 := compute_moves(step1, step2, current_pos, desired_1, desired_pos, forbid);
+            move2 := compute_moves(step2, step1, current_pos, desired_2, desired_pos, forbid);
+
+            if !move1.empty() {
+                all_moves.push_back(move1);
+            }
+            if !move2.empty() && move2 != move1 {
+                all_moves.push_back(move2);
+            }
+
+            current_pos = desired_pos;
+
+            return all_moves;
+        }
+
+        compute_sequence: <first_iter_t: bool = false>(this, keys1: robotconfig, keys2: robotconfig, codes: char_row_t, forbid1: coords,
+                                forbid2: coords, iter: int, max_iter: int, inout memo_map: memo_map_t) -> size_t =
+        {
+            keys_to_use: robotconfig;
+            forbid_to_use: coords;
+            if (first_iter_t) {
+                keys_to_use = keys1;
+                forbid_to_use = forbid1;
+            } else {
+                keys_to_use = keys2;
+                forbid_to_use = forbid2;
+            }
+            current_pos: coords = keys_to_use.at('A');
+            total_size: size_t = 0;
+            for codes do (key) {
+                moves_size: size_t = 0;
+                keyvalue := memo_inputs(key, current_pos, iter).hash();
+                if (memo_map.contains(keyvalue)) {
+                    moves_size = memo_map[keyvalue];
+                    current_pos = keys_to_use.at(key);
+                } else {
+                    all_moves := compute_all_moves(keys_to_use, key, current_pos, forbid_to_use);
+
+                    if (iter < max_iter) {
+                        values: std::array<size_t, 2> = ( (1ULL << 63) - 1, (1ULL << 63) - 1);
+                        i: size_t = 0;
+                        for all_moves do (seq) {
+                            values.at(i) = compute_sequence(keys1, keys2, seq, forbid1, forbid2, iter + 1, max_iter, memo_map);
+                            i++;
+                        }
+                        moves_size += std::min(values.at(0), values.at(1));
+                    } else {
+                        if all_moves.size() == 1 {
+                            moves_size += all_moves.at(0).size();
+                        } else {
+                            moves_size += std::min(all_moves.at(0).size(), all_moves.at(1).size());
+                        }
+                    }
+                    memo_map[keyvalue] = moves_size;
+                }
+                total_size += moves_size;
+            }
+
+            return total_size;
+        }
+
         run : (override inout this) -> i64 = {
             total : i64 = 0;
             // First, let's find the quickest way to do any particular task.
             // We assume that it's always quicker to turn just once.
             
             // Configuration of robots.
-            robot0_config: std::unordered_map<char, coords> = (
+            robot0_config: robotconfig = (
                 ('A', (2,3)),
                 ('0', (1,3)),
                 ('1', (0,2)),
@@ -504,7 +695,7 @@ Day21: namespace = {
                 ('9', (2,0))
             );
 
-            robot1_config: std::unordered_map<char, coords> = (
+            robot1_config: robotconfig = (
                 ('A', (2,0)),
                 ('^', (1,0)),
                 ('<', (0,1)),
@@ -512,6 +703,33 @@ Day21: namespace = {
                 ('>', (2,1))
             );
 
+            /*optimized_moves := directmovemap();
+            optimized_moves[srcdst('<', '<').hash()] = "A";
+            optimized_moves[srcdst('<', '>').hash()] = ">>A";
+            optimized_moves[srcdst('<', 'A').hash()] = ">>^A";
+            optimized_moves[srcdst('<', '^').hash()] = ">^A";
+            optimized_moves[srcdst('<', 'v').hash()] = ">A";
+            optimized_moves[srcdst('>', '>').hash()] = "A";
+            optimized_moves[srcdst('>', '<').hash()] = "<<A";
+            optimized_moves[srcdst('>', 'A').hash()] = "^A";
+            optimized_moves[srcdst('>', 'v').hash()] = "<A";
+            optimized_moves[srcdst('>', '^').hash()] = "<^A";
+            optimized_moves[srcdst('^', '^').hash()] = "A";
+            optimized_moves[srcdst('^', '<').hash()] = "v<A";
+            optimized_moves[srcdst('^', '>').hash()] = "v>A";
+            optimized_moves[srcdst('^', 'A').hash()] = ">A";
+            optimized_moves[srcdst('^', 'v').hash()] = "vA";
+            optimized_moves[srcdst('v', 'v').hash()] = "A";
+            optimized_moves[srcdst('v', '^').hash()] = "^A";
+            optimized_moves[srcdst('v', 'A').hash()] = "^>A";
+            optimized_moves[srcdst('v', '<').hash()] = "<A";
+            optimized_moves[srcdst('v', '>').hash()] = ">A";
+            optimized_moves[srcdst('A', 'A').hash()] = "A";
+            optimized_moves[srcdst('A', '<').hash()] = "v<<A";
+            optimized_moves[srcdst('A', '>').hash()] = "vA";
+            optimized_moves[srcdst('A', '<').hash()] = "<A";
+            optimized_moves[srcdst('A', 'v').hash()] = "<vA";
+            */
             robot0 := robot(robot0_config);
             robot1 := robot(robot1_config);
             robot1old := robot(robot1_config);
@@ -642,12 +860,22 @@ Day21: namespace = {
                 }
                 overall_complexity: u64 = complexity * std::stoi(line);
 
+                memo_map := memo_map_t();
+                codes := char_row_t();
+                for line do (ch) {
+                    codes.push_back(ch);
+                }
+                complexity_borrowed := compute_sequence<true>(robot0_config, robot1_config, codes, coords(0, 3), coords(0, 0), 0, reps, memo_map);
+                _ = memo_map;
+                overall_complexity_borrowed: u64 = complexity_borrowed * std::stoi(line);
+
                 if m_verbose {
                     //std::cout << "Complexity in old algorithm for line (line)$ is (complexity_old)$" << std::endl;
                     //std::cout << "Complexity in old algorithm 2 for line (line)$ is (complexity_old2)$" << std::endl;
-                    std::cout << "Complexity for line (line)$ is (complexity)$ * (std::stoi(line))$ = (overall_complexity)$" << std::endl;
+                    std::cout << "Complexity (my algorithm) for line (line)$ is (complexity)$ * (std::stoi(line))$ = (overall_complexity)$" << std::endl;
+                    std::cout << "Complexity (borrowed algorithm) for line (line)$ is (complexity_borrowed)$ * (std::stoi(line))$ = (overall_complexity_borrowed)$" << std::endl;
                 }
-                total += overall_complexity;
+                total += overall_complexity_borrowed;
             }
             return total;
         }
