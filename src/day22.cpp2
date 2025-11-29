@@ -27,29 +27,93 @@ Day22: namespace = {
             return secret;
         }
 
+        display_key: (key: u32) -> std::string = {
+            val1 := ((key >> 15) & 0x1F) as i64 - 16;
+            val2 := ((key >> 10) & 0x1F) as i64 - 16;
+            val3 := ((key >> 5) & 0x1F) as i64 - 16;
+            val4 := ((key >> 0) & 0x1F) as i64 - 16;
+            return "((val1:d)$, (val2:d)$, (val3:d)$, (val4:d)$) = 0x(key:x)$";
+        }
+
         run : (override inout this) -> i64 = {
             total: i64 = 0;
             repeat := m_argint;
             if repeat == 0 {
                 repeat = 2000;
             }
+            histories := std::vector<std::vector<i8>>();
             for m_lines do (line) {
                 secret: u32 = cpp2::unchecked_narrow<u32>(std::stoul(line));
+                history := std::vector<i8>();
                 if m_verbose {
                     std::cout << "Using secret (secret)$ and permuting (repeat)$ times" << std::endl; 
                 }
                 for 0..<repeat do (i) {
                     secret = generate_secret(secret);
+                    price: i8 = 0;
+                    price = cpp2::unchecked_narrow<i8>(secret % 10);
                     if m_verbose {
-                        std::cout << "After (i+1)$ iterations, secret is (secret)$" << std::endl;
+                        std::cout << "After (i+1)$ iterations, secret is (secret)$, price is (price)$" << std::endl;
                     }
+                    history.push_back(price);
                 }
                 if m_verbose {
                     std::cout << "Final secret is (secret)$" << std::endl;
                 }
+                histories.push_back(history);
                 total += secret;
             }
-            return total;
+            if !m_part_two {
+                return total;
+            }
+
+            // OK. Now the fun stuff :)
+            max_value: u32 = 0;
+            max_key: u32 = 0;
+            keys := std::unordered_map<u32, u32>();
+            for histories do (history) {
+                if m_verbose {
+                    std::cout << std::endl << std::endl << "New history:" << std::endl;
+                }
+                keys_seen := std::unordered_set<u32>();
+                skip: int = 4;
+                key: u32 = 0;
+                previous: i8 = 0;
+                for history do (value) {
+                    key = (key & 0x7FFF) << 5;
+                    key += (value - previous) + 16;
+                    if skip == 0 {
+                        if m_verbose {
+                            std::cout << "Considering key (display_key(key))$, seen (keys_seen.count(key))$, value (value)$" << std::endl;
+                        }
+                        if !keys_seen.count(key) {
+                            _ = keys_seen.insert(key);
+                            if !keys.count(key) {
+                                keys[key] = 0;
+                            }
+                            keys[key] += value;
+                            if m_verbose {
+                                std::cout << "  (display_key(key))$: (keys[key])$" << std::endl;
+                            }
+                            if keys[key] > max_value {
+                                if m_verbose {
+                                    std::cout << "    New high!" << std::endl;
+                                }
+                                max_key = key;
+                                max_value = keys[key];
+                            }
+                        }
+                    }
+                    else {
+                        skip--;
+                    }
+                    previous = value;
+                }
+            }
+            if m_verbose {
+                std::cout << "Maximum value is (max_value)$ derived from key (display_key(max_key))$" << std::endl;
+            }
+            return max_value;
         }
     }
 }
