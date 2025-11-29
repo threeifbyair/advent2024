@@ -180,6 +180,52 @@ Day21: namespace = {
                 return outvec;  
             }
 
+            optimize_our_moveset: (inout this) = {
+                // Expand each moveset by one repetition, and keep only the shortest ones.
+                outmoves := movemap();
+                for moves do (kv) {
+                    movehash := kv.first;
+                    moveseqset := kv.second;
+                    optimized_moves := optimize_moveset_single(moveseqset, this);
+                    outmoves[movehash] = optimized_moves;
+                }
+                moves = outmoves;
+            }
+
+            optimize_moveset: (this, ourmoves: movemap, other: robot) -> movemap = {
+                // Expand each moveset by one repetition, and keep only the shortest ones.
+                outmoves := movemap();
+                for ourmoves do (kv) {
+                    movehash := kv.first;
+                    moveseqset := kv.second;
+                    optimized_moves := optimize_moveset_single(moveseqset, other);
+                    outmoves[movehash] = optimized_moves;
+                }
+                return outmoves;
+            }
+
+            optimize_moveset_single: (this, ourmoves: moveset, other: robot) -> moveset = {
+                outmoves := moveset();
+                outinmoves := moveset();
+                min_length: size_t = (1ULL << 63) - 1;
+                for ourmoves do (mv) {
+                    mvset : moveset = (mv);
+                    expanded_move := other.expand_sequence(mvset);
+                    for expanded_move do (mv2) {
+                        if mv2.length() < min_length {
+                            min_length = mv2.length();
+                            outmoves.clear();
+                            outinmoves.clear();
+                        }
+                        if mv2.length() == min_length {
+                            _ = outmoves.insert(mv2);
+                            _ = outinmoves.insert(mv);
+                        }
+                    }
+                }
+                return outinmoves;
+            }
+
             precompute_moves: (this, other: robot) -> movemap = {
                 outmoves := movemap();
                 // Precompute all the moves between keys.
@@ -247,6 +293,61 @@ Day21: namespace = {
                 reverse_keys = that.reverse_keys;
                 position = that.position;
                 moves = that.moves;
+            }
+
+            expand_sequence: (this, inseq: moveset) -> moveset = {
+                outseq := moveset();
+                workqueue := std::deque<std::pair<std::string, std::string>>();
+                for inseq do (seq) {
+                    _ = workqueue.emplace_back(std::make_pair(std::string(""), "A" + seq));
+                }
+                while workqueue.size() {
+                    this_pair := workqueue.front();
+                    stringsofar := this_pair.first;
+                    movestocome := this_pair.second;
+                    if movestocome.length() < 2U {
+                        // We're done. 
+                        if outseq.size() == 0 || stringsofar.length() < outseq.begin()*.length() {
+                            outseq.clear();
+                        }
+                        if outseq.size() == 0 || stringsofar.length() == outseq.begin()*.length() {
+                            _ = outseq.insert(stringsofar);
+                        }
+                    }
+                    else {
+                        // Grab the current move.
+                        nextmovehash: u16 = srcdst(movestocome[0], movestocome[1]).hash();
+                        assert(moves.count(nextmovehash) != 0);
+                        nextmoves := moves.at(nextmovehash);
+                        for nextmoves do (thismove) {
+                            _ = workqueue.emplace_back(stringsofar + thismove + "A", std::string(movestocome.data()+1, movestocome.length()-1));
+                        }
+                    }
+                    workqueue.pop_front();
+                }
+                return outseq;
+            }
+
+            expand_fast_by_one: (this, inseq: moveset) -> moveset = {
+                outseq := moveset();
+                for inseq do (seq) {
+                    instr := "A" + seq;
+                    outstr: std::string = "";
+                    for 0..<(instr.length() - 1) do (i) {
+                        nextmovehash: u16 = srcdst(instr[i], instr[i+1]).hash();
+                        assert(moves.count(nextmovehash) != 0);
+                        nextmoves := moves.at(nextmovehash);
+                        outstr += nextmoves.begin()* + "A";
+                    }
+                    if outseq.size() == 0 || outstr.length() < outseq.begin()*.length() {
+                        outseq.clear();
+                    }
+                    if outseq.size() == 0 || outstr.length() == outseq.begin()*.length() {
+                        _ = outseq.insert(outstr);
+                    }
+                }
+
+                return outseq;
             }
 
             display: (this) = {
@@ -343,61 +444,6 @@ Day21: namespace = {
             return output;
         }
 
-        expand_sequence: (this, ourrobot: robot, inseq: moveset) -> moveset = {
-            outseq := moveset();
-            workqueue := std::deque<std::pair<std::string, std::string>>();
-            for inseq do (seq) {
-                _ = workqueue.emplace_back(std::make_pair(std::string(""), "A" + seq));
-            }
-            while workqueue.size() {
-                this_pair := workqueue.front();
-                stringsofar := this_pair.first;
-                movestocome := this_pair.second;
-                if movestocome.length() < 2U {
-                    // We're done. 
-                    if outseq.size() == 0 || stringsofar.length() < outseq.begin()*.length() {
-                        outseq.clear();
-                    }
-                    if outseq.size() == 0 || stringsofar.length() == outseq.begin()*.length() {
-                        _ = outseq.insert(stringsofar);
-                    }
-                }
-                else {
-                    // Grab the current move.
-                    nextmovehash: u16 = srcdst(movestocome[0], movestocome[1]).hash();
-                    assert(ourrobot.moves.count(nextmovehash) != 0);
-                    nextmoves := ourrobot.moves.at(nextmovehash);
-                    for nextmoves do (thismove) {
-                        _ = workqueue.emplace_back(stringsofar + thismove + "A", std::string(movestocome.data()+1, movestocome.length()-1));
-                    }
-                }
-                workqueue.pop_front();
-            }
-            return outseq;
-        }
-
-        expand_fast_by_one: (this, ourrobot: robot, inseq: moveset) -> moveset = {
-            outseq := moveset();
-            for inseq do (seq) {
-                instr := "A" + seq;
-                outstr: std::string = "";
-                for 0..<(instr.length() - 1) do (i) {
-                    nextmovehash: u16 = srcdst(instr[i], instr[i+1]).hash();
-                    assert(ourrobot.moves.count(nextmovehash) != 0);
-                    nextmoves := ourrobot.moves.at(nextmovehash);
-                    outstr += nextmoves.begin()* + "A";
-                }
-                if outseq.size() == 0 || outstr.length() < outseq.begin()*.length() {
-                    outseq.clear();
-                }
-                if outseq.size() == 0 || outstr.length() == outseq.begin()*.length() {
-                    _ = outseq.insert(outstr);
-                }
-            }
-
-            return outseq;
-        }
-
         graph_from_sequence: (this, seq: std::string) -> movecount = {
             ourgraph := movecount();
             inseq := "A" + seq;
@@ -468,16 +514,40 @@ Day21: namespace = {
 
             robot0 := robot(robot0_config);
             robot1 := robot(robot1_config);
-            robots := std::vector<robot>();
-            robots.push_back(robot1);
-            robots.push_back(robot1);
-            robots.push_back(robot0);
+            robot1old := robot(robot1_config);
 
             //seq := playback_sequence(robots, "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A");
             //std::cout << "Day 21 output: (seq)$" << std::endl;
 
             robot01_moves := robot1.precompute_moves(robot0);
-            
+            //robot01_moves2 := robot1.optimize_moveset(robot01_moves, robot0);
+            //for robot01_moves do (kv) {
+            //    std::cout << "Robot0 to Robot1 Move (kv.first >> 8:c)$(kv.first & 0xFF:c)$: " << std::endl;
+            //    for kv.second do (s) {
+            //        std::cout << "  (s)$" << std::endl;
+            //    }
+            //    assert(robot01_moves2.count(kv.first) != 0);
+            //    std::cout << " Optimized to:" << std::endl;
+            //    for robot01_moves2.at(kv.first) do (s) {
+            //        std::cout << "  (s)$" << std::endl;
+            //    }
+            //}
+
+
+            //robot1_moves := robot1.precompute_moves(robot1);
+            robot1.optimize_our_moveset();
+            //robot1_moves2 := robot1.optimize_moveset(robot1_moves, robot1);
+            //for robot1_moves do (kv) {
+            //    std::cout << "Robot1 to Robot1 Move (kv.first >> 8:c)$(kv.first & 0xFF:c)$: " << std::endl;
+            //    for kv.second do (s) {
+            //        std::cout << "  (s)$" << std::endl;
+            //    }
+            //    assert(robot1_moves2.count(kv.first) != 0);
+            //    std::cout << " Optimized to:" << std::endl;
+            //    for robot1_moves2.at(kv.first) do (s) {
+            //        std::cout << "  (s)$" << std::endl;
+            //    }
+            //}
             robot1_graph := robot1.graph_from_moves(robot1.moves);
 
             if m_verbose {
@@ -489,7 +559,7 @@ Day21: namespace = {
             }
             reps: int;
             if m_part_two {
-                reps = 3;
+                reps = 25;
             }
             else {
                 reps = 2;
@@ -501,8 +571,8 @@ Day21: namespace = {
                 }
                 inseq := moveset();
                 _ = inseq.insert(line);
-                //outseq := expand_fast_by_one(robot0, inseq);
-                outseq := expand_sequence(robot0, inseq);
+                outseq := robot0.expand_sequence(inseq);
+                //outseq2 := robot0.expand_sequence(inseq);
                 if m_verbose {
                     std::cout << "After first expansion, sequences are:" << std::endl;
                     for outseq do (s) {
@@ -533,19 +603,28 @@ Day21: namespace = {
                             std::cout << std::endl;
                         }
                     }
-                    //newoutseq := expand_fast_by_one(robot1, outseq);
-                    newoutseq := expand_sequence(robot1, outseq);
-                    if m_verbose {
-                        std::cout << "After repetition (i)$, sequences are:" << std::endl;
-                        for newoutseq do (s) {
-                            std::cout << " (s)$" << std::endl;
-                        }
-                        std::cout << std::endl;
-                    }
-                    outseq = newoutseq;
+                    //newoutseq := robot1old.expand_sequence(outseq);
+                    //if m_verbose {
+                    //   std::cout << "After repetition (i)$, old sequences (length (newoutseq.size())$) are:" << std::endl;
+                    //    for newoutseq do (s) {
+                    //        std::cout << " (s)$" << std::endl;
+                    //    }
+                    //    std::cout << std::endl;
+                    //}
+                    //newoutseq2 := robot1.expand_sequence(outseq2);
+                    //if m_verbose {
+                    //   std::cout << "After repetition (i)$, new sequences (length (newoutseq2.size())$) are:" << std::endl;
+                    //    for newoutseq2 do (s) {
+                    //        std::cout << " (s)$" << std::endl;
+                    //    }
+                    //    std::cout << std::endl;
+                    //}
+                    //outseq = newoutseq;
+                    //outseq2 = newoutseq2;
                     outgraphs = newoutgraphs;
                 }
-                complexity_old := outseq.begin()*.length() * std::stoi(line);
+                //complexity_old := outseq.begin()*.length() * std::stoi(line);
+                //complexity_old2 := outseq2.begin()*.length() * std::stoi(line);
                 complexity : u64 = (1ULL << 63) - 1;
                 for outgraphs do (outgraph) {
                     graph_complexity: u64 = 0;
@@ -564,12 +643,12 @@ Day21: namespace = {
                 overall_complexity: u64 = complexity * std::stoi(line);
 
                 if m_verbose {
-                    std::cout << "Complexity in old algorithm for line (line)$ is (complexity_old)$" << std::endl;
+                    //std::cout << "Complexity in old algorithm for line (line)$ is (complexity_old)$" << std::endl;
+                    //std::cout << "Complexity in old algorithm 2 for line (line)$ is (complexity_old2)$" << std::endl;
                     std::cout << "Complexity for line (line)$ is (complexity)$ * (std::stoi(line))$ = (overall_complexity)$" << std::endl;
                 }
                 total += overall_complexity;
             }
-            _ = robots; // Keep robots alive
             return total;
         }
     }
