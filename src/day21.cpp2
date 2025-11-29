@@ -589,7 +589,7 @@ Day21: namespace = {
         //this returns either 1 or 2 possible moves to get to the desired key
         //for example <<^A or ^<<A
         //<^<A is never omptimal so it is never considered
-        compute_all_moves: (this, keys: robotconfig, key: char, copy current_pos: coords, forbid: coords) -> codes_list_t =
+        compute_all_moves: (this, keys: robotconfig, key: char, inout current_pos: coords, forbid: coords) -> codes_list_t =
         {
             all_moves := codes_list_t();
 
