@@ -9,6 +9,44 @@ Day23: namespace = {
             Advent2024::day = (lines, part_two, verbose, argint);
         }
 
+        find_longest_vec: (connectivity: std::unordered_map<u16, std::unordered_set<u16>>, inout vec: std::vector<u16>) -> std::vector<u16> = {
+            highest: u16 = vec.back();
+            longest_vec:= std::vector<u16>();
+            for connectivity do (kv) {
+                key := kv.first;
+                valset := kv.second;
+                if key <= highest {
+                    continue;
+                }
+                found: bool = true;
+                for vec do (vecval) {
+                    if !valset.count(vecval) {
+                        found = false;
+                        break;
+                    }
+                }
+                if found {
+                    // We found a group. Can we extend it?
+                    vec.push_back(key);
+                    if vec.size() > longest_vec.size() {
+                        longest_vec.clear();
+                        for vec do (val) {
+                            longest_vec.push_back(val);
+                        }
+                    }
+                    maybe_longest_vec := find_longest_vec(connectivity, vec);
+                    if maybe_longest_vec.size() > longest_vec.size() {
+                        longest_vec.clear();
+                        for maybe_longest_vec do (val) {
+                            longest_vec.push_back(val);
+                        }
+                    }
+                    _ = vec.pop_back();
+                }
+            }
+            return longest_vec;
+        }
+
         run : (override inout this) -> i64 = {
             connectivity := std::unordered_map<u16, std::unordered_set<u16>>();
             for m_lines do (line) {
@@ -28,37 +66,68 @@ Day23: namespace = {
                 _ = connectivity[src].insert(dst);
                 _ = connectivity[dst].insert(src);
             }
+            total: i64 = 0;
 
-            // Now let's look for triples.
-            triples := std::vector<u64>();
-            for connectivity do (kv) {
-                pc1 := kv.first;
-                for kv.second do (pc2) {
-                    if pc1 >= pc2 {
-                        continue;
-                    }
-                    for connectivity[pc2] do (pc3) {
-                        if pc2 >= pc3 {
-                            continue;
-                        }
-                        if connectivity[pc3].count(pc1) {
-                            // This is a triple.
-                            tripleval: u64 = 0;
-                            tripleval = ((pc1 as u64) << 32) | ((pc2 as u64) << 16) | (pc3 as u64);
-                            triples.push_back(tripleval);
+            if m_part_two {
+                // Let's find a connected subgraph.
+                longest_vec := std::vector<u16>();
+                for connectivity do (kv) {
+                    pc1 := kv.first;
+                    vec := std::vector<u16>();
+                    vec.push_back(pc1);
+                    maybe_longest_vec := find_longest_vec(connectivity, vec);
+                    _ = vec.pop_back();
+                    if maybe_longest_vec.size() > longest_vec.size() {
+                        longest_vec.clear();
+                        for maybe_longest_vec do (val) {
+                            longest_vec.push_back(val);
                         }
                     }
                 }
+                first: bool = true;
+                for longest_vec do (val) {
+                    if first {
+                        std::cout << "Code: ";
+                        first = false;
+                    }
+                    else {
+                        std::cout << ",";
+                    }
+                    std::cout << "(val>>8:c)$(val&0xFF:c)$";
+                }
+                std::cout << std::endl;
             }
+            else {
+                // Now let's look for triples.
+                triples := std::vector<u64>();
+                for connectivity do (kv) {
+                    pc1 := kv.first;
+                    for kv.second do (pc2) {
+                        if pc1 >= pc2 {
+                            continue;
+                        }
+                        for connectivity[pc2] do (pc3) {
+                            if pc2 >= pc3 {
+                                continue;
+                            }
+                            if connectivity[pc3].count(pc1) {
+                                // This is a triple.
+                                tripleval: u64 = 0;
+                                tripleval = ((pc1 as u64) << 32) | ((pc2 as u64) << 16) | (pc3 as u64);
+                                triples.push_back(tripleval);
+                            }
+                        }
+                    }
+                }
 
-            // Now let's look for triples with 0x74 (t) in them.
-            total: i64 = 0;
-            for triples do (triple) {
-                if (triple & 0xFF0000000000ULL) == 0x740000000000ULL ||
-                   (triple & 0xFF000000ULL) == 0x74000000ULL ||
-                   (triple & 0xFF00ULL) == 0x7400ULL {
-                    total++;
-                } 
+                // Now let's look for triples with 0x74 (t) in them.
+                for triples do (triple) {
+                    if (triple & 0xFF0000000000ULL) == 0x740000000000ULL ||
+                    (triple & 0xFF000000ULL) == 0x74000000ULL ||
+                    (triple & 0xFF00ULL) == 0x7400ULL {
+                        total++;
+                    } 
+                }
             }
             return total;
         }
